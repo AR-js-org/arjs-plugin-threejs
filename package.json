@@ -1,0 +1,62 @@
+{
+  "name": "@ar-js-org/arjs-plugin-threejs",
+  "version": "0.1.0",
+  "description": "Three.js renderer plugin for AR.js-core",
+  "main": "dist/arjs-plugin-threejs.js",
+  "module": "dist/arjs-plugin-threejs.mjs",
+  "exports": {
+    ".": {
+      "import": "./dist/arjs-plugin-threejs.mjs",
+      "require": "./dist/arjs-plugin-threejs.js",
+      "default": "./dist/arjs-plugin-threejs.mjs"
+    }
+  },
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "vite build",
+    "build:vite": "vite build",
+    "dev": "vite build --watch",
+    "dev:vite": "vite build --watch",
+    "test": "echo \"Error: no test specified\" && exit 0",
+    "prepublishOnly": "npm run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AR-js-org/arjs-plugin-threejs.git"
+  },
+  "keywords": [
+    "ar",
+    "arjs",
+    "threejs",
+    "three.js",
+    "webgl",
+    "augmented-reality",
+    "plugin",
+    "renderer"
+  ],
+  "author": "AR.js Community",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/AR-js-org/arjs-plugin-threejs/issues"
+  },
+  "homepage": "https://github.com/AR-js-org/arjs-plugin-threejs#readme",
+  "peerDependencies": {
+    "ar.js-core": "^0.2.0",
+    "three": ">=0.150.0"
+  },
+  "peerDependenciesMeta": {
+    "ar.js-core": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "three": "^0.170.0",
+    "vite": "^5.0.0"
+  }
+}
