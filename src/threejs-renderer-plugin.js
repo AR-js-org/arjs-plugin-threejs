@@ -294,7 +294,16 @@ export class ThreeJSRendererPlugin {
 
   /**
    * Subscribe to an event and store the unsubscribe function
+   * 
+   * Supports multiple event bus API patterns:
+   * - on/off pattern: eventBus.on(event, handler) / eventBus.off(event, handler)
+   * - subscribe pattern: unsubscribe = eventBus.subscribe(event, handler)
+   * - addEventListener pattern: eventBus.addEventListener(event, handler) / eventBus.removeEventListener(event, handler)
+   * 
    * @private
+   * @param {Object} eventBus - Event bus object with one of the supported APIs
+   * @param {string} eventName - Name of the event to subscribe to
+   * @param {Function} handler - Event handler function
    */
   _subscribe(eventBus, eventName, handler) {
     try {
