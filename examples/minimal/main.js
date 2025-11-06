@@ -1,8 +1,12 @@
 import * as THREE from 'three';
 import { ThreeJSRendererPlugin } from '../../dist/arjs-plugin-threejs.mjs';
 
+// Note: This example uses a mock AR.js-core engine since ar.js-core is not yet published.
+// When ar.js-core is available, replace MockAREngine with:
+// import { AREngine } from 'ar.js-core';
+// const engine = new AREngine();
+
 // Mock AR.js-core engine for demonstration
-// In real usage, you would import from 'ar.js-core'
 class MockAREngine {
   constructor() {
     this.listeners = new Map();

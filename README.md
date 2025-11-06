@@ -104,6 +104,8 @@ npm install
 npm run dev
 ```
 
+**Note:** The example currently uses a mock AR.js-core engine since `ar.js-core` is not yet published to npm. When `ar.js-core` becomes available, the example will be updated to use the real engine. The mock demonstrates the plugin's lifecycle hooks, marker anchors, and rendering integration.
+
 ## License
 
 MIT
