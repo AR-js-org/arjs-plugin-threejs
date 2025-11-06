@@ -1,0 +1,37 @@
+{
+  "name": "@AR-js-org/arjs-plugin-threejs",
+  "version": "0.1.0",
+  "description": "Three.js renderer plugin for AR.js-core",
+  "type": "module",
+  "main": "dist/arjs-plugin-threejs.js",
+  "module": "dist/arjs-plugin-threejs.mjs",
+  "exports": {
+    ".": {
+      "import": "./dist/arjs-plugin-threejs.mjs",
+      "require": "./dist/arjs-plugin-threejs.js",
+      "default": "./dist/arjs-plugin-threejs.mjs"
+    }
+  },
+  "sideEffects": false,
+  "scripts": {
+    "build:vite": "vite build",
+    "dev:vite": "vite",
+    "serve:vite": "vite preview",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "ar.js",
+    "threejs",
+    "augmented-reality",
+    "webxr"
+  ],
+  "author": "AR.js Org",
+  "license": "MIT",
+  "devDependencies": {
+    "vite": "^7.1.12"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AR-js-org/arjs-plugin-threejs.git"
+  }
+}
