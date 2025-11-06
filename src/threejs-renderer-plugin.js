@@ -36,8 +36,8 @@ export class ThreeJSRendererPlugin {
   /**
    * Initialize the plugin with AR.js engine
    */
-  init(engine) {
-    this.engine = engine;
+  init(core) {
+    this.core = core;
     
     // Create Three.js renderer
     this.renderer = new THREE.WebGLRenderer({
@@ -66,7 +66,7 @@ export class ThreeJSRendererPlugin {
    * Enable the plugin (attach to DOM and subscribe to events)
    */
   enable() {
-    if (!this.engine) {
+    if (!this.core) {
       throw new Error('Plugin must be initialized before enabling');
     }
 
@@ -85,9 +85,9 @@ export class ThreeJSRendererPlugin {
     this.boundHandleResize = this.handleResize.bind(this);
     
     // Subscribe to engine events
-    this.engine.on('engine:update', this.boundHandleUpdate);
-    this.engine.on('ar:marker', this.boundHandleMarker);
-    this.engine.on('ar:camera', this.boundHandleCamera);
+    this.core.eventBus.on('engine:update', this.boundHandleUpdate);
+    this.core.eventBus.on('ar:marker', this.boundHandleMarker);
+    this.core.eventBus.on('ar:camera', this.boundHandleCamera);
     
     // Handle window resize
     window.addEventListener('resize', this.boundHandleResize);
@@ -99,17 +99,17 @@ export class ThreeJSRendererPlugin {
    * Disable the plugin (remove event listeners)
    */
   disable() {
-    if (!this.engine) return;
+    if (!this.core) return;
     
     // Unsubscribe from engine events using stored bound references
     if (this.boundHandleUpdate) {
-      this.engine.off('engine:update', this.boundHandleUpdate);
+      this.core.off('engine:update', this.boundHandleUpdate);
     }
     if (this.boundHandleMarker) {
-      this.engine.off('ar:marker', this.boundHandleMarker);
+      this.core.off('ar:marker', this.boundHandleMarker);
     }
     if (this.boundHandleCamera) {
-      this.engine.off('ar:camera', this.boundHandleCamera);
+      this.core.off('ar:camera', this.boundHandleCamera);
     }
     
     // Remove resize listener using stored bound reference
@@ -159,7 +159,7 @@ export class ThreeJSRendererPlugin {
       this.camera = null;
     }
     
-    this.engine = null;
+    this.core = null;
     
     console.log('[ThreeJSRendererPlugin] Disposed');
   }

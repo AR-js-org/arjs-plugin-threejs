@@ -105,6 +105,7 @@ async function bootstrap() {
         setStatus('Worker error (see console)', 'error');
     });
 
+    engine.eventBus.on('ar:getMarker', (e) => console.log('[example] ar:getMarker', e));
     // Marker events for logging only (the Three plugin manages anchors and visibility)
     engine.eventBus.on('ar:markerFound', (d) => log(`markerFound: ${JSON.stringify(d)}`));
     engine.eventBus.on('ar:markerUpdated', (d) => {/* too chatty for logs; uncomment if needed */});
@@ -117,7 +118,7 @@ async function bootstrap() {
 
     // Tracking plugin
     artoolkit = new ArtoolkitPlugin({
-        cameraParametersUrl: '/examples/vite-artoolkit/data/camera_para.dat',
+        cameraParametersUrl: '/examples/minimal/data/camera_para.dat',
         minConfidence: 0.6,
     });
     await artoolkit.init(ctx);
@@ -130,7 +131,7 @@ async function bootstrap() {
         antialias: true,
         preserveDrawingBuffer: false,
     });
-    await threePlugin.init(ctx.eventBus);
+    await threePlugin.init(ctx);
     await threePlugin.enable();
 
     // Start ECS loop (systems/plugins tick)
@@ -220,7 +221,7 @@ async function loadMarker() {
         loadBtn.disabled = true;
         setStatus('Loading marker…', 'normal');
 
-        const patternUrl = '/examples/vite-artoolkit/data/patt.hiro';
+        const patternUrl = '/examples/minimal/data/patt.hiro';
         const res = await artoolkit.loadMarker(patternUrl, 1);
         const markerId = res.markerId;
         log(`loadMarker result: ${JSON.stringify(res)}`);
