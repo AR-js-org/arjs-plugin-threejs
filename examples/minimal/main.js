@@ -1,13 +1,14 @@
 // Import Three.js via ESM CDN (or your bundler)
 import * as THREE from 'https://unpkg.com/three@0.161.0/build/three.module.js';
-const arjsCore = await import('./vendor/dist/arjs-core.mjs');
 
-const Engine = arjsCore.Engine || arjsCore.default;
-const CaptureSystem = arjsCore.CaptureSystem || arjsCore.default;
-const FramePumpSystem = arjsCore.FramePumpSystem || arjsCore.default;
-const SOURCE_TYPES = arjsCore.SOURCE_TYPES || arjsCore.default;
-const webcamPlugin = arjsCore.webcamPlugin || arjsCore.default;
-const defaultProfilePlugin = arjsCore.defaultProfilePlugin || arjsCore.default;
+import {
+    Engine,
+    CaptureSystem,
+    FramePumpSystem,
+    SOURCE_TYPES,
+    webcamPlugin,
+    defaultProfilePlugin
+} from './vendor/ar-js-core/arjs-core.mjs';
 
 // Example: AR.js Core ECS + ArtoolkitPlugin + ThreeJSRendererPlugin
 
@@ -86,20 +87,35 @@ async function bootstrap() {
     engine.pluginManager.register(webcamPlugin.id, webcamPlugin);
 
     // Import plugins
-    const artoolkitMod = await import ('arjs-plugin-artoolkit');
+    const artoolkitMod = await import ('./vendor/arjs-plugin-artoolkit/arjs-plugin-artoolkit.esm.js');
     const ArtoolkitPlugin = artoolkitMod.ArtoolkitPlugin || artoolkitMod.default;
 
     // Import the ThreeJS renderer plugin from the external repo build
     // Make sure the ESM file from PR #2 is available at this path, or adjust accordingly.
-    const threeMod = await import('arjs-plugin-threejs');
+    const threeMod = await import('../../dist/arjs-plugin-threejs.mjs');
     const ThreeJSRendererPlugin = threeMod.ThreeJSRendererPlugin || threeMod.default;
+
+    const enableLoadBtn = () => {
+        loadBtn.disabled = false;
+        setStatus('Worker ready. You can start the webcam and load the marker.', 'success');
+    };
 
     // Event listeners before enabling
     engine.eventBus.on('ar:workerReady', () => {
         log('Worker ready');
         setStatus('Worker ready. You can start the webcam and load the marker.', 'success');
-        loadBtn.disabled = false;
+        //loadBtn.disabled = false;
+        enableLoadBtn()
+        try {
+            const proj = artoolkit?.getProjectionMatrix?.();
+            const arr = proj?.toArray ? proj.toArray() : proj;
+            if (Array.isArray(arr) && arr.length === 16) {
+                engine.eventBus.emit('ar:camera', { projectionMatrix: arr });
+            }
+        } catch {}
     });
+    //engine.eventBus.on('ar:ready', enableLoadBtn);
+    //engine.eventBus.on('ar:initialized', enableLoadBtn);
     engine.eventBus.on('ar:workerError', (e) => {
         log(`workerError: ${JSON.stringify(e)}`);
         setStatus('Worker error (see console)', 'error');
