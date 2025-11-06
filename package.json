@@ -28,7 +28,8 @@
   "author": "AR.js Org",
   "license": "MIT",
   "devDependencies": {
-    "vite": "^7.1.12"
+    "vite": "^7.1.12",
+    "three": "^0.161.0"
   },
   "repository": {
     "type": "git",
