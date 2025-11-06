@@ -19,6 +19,12 @@ export class ThreeJSRendererPlugin {
     this.anchors = new Map();
     this.containerElement = null;
     
+    // Store bound event handlers for proper removal
+    this.boundHandleUpdate = null;
+    this.boundHandleMarker = null;
+    this.boundHandleCamera = null;
+    this.boundHandleResize = null;
+    
     // Store options
     this.options = {
       antialias: options.antialias !== undefined ? options.antialias : true,
@@ -72,13 +78,19 @@ export class ThreeJSRendererPlugin {
     // Set initial size
     this.handleResize();
     
+    // Bind event handlers once and store references
+    this.boundHandleUpdate = this.handleUpdate.bind(this);
+    this.boundHandleMarker = this.handleMarker.bind(this);
+    this.boundHandleCamera = this.handleCamera.bind(this);
+    this.boundHandleResize = this.handleResize.bind(this);
+    
     // Subscribe to engine events
-    this.engine.on('engine:update', this.handleUpdate.bind(this));
-    this.engine.on('ar:marker', this.handleMarker.bind(this));
-    this.engine.on('ar:camera', this.handleCamera.bind(this));
+    this.engine.on('engine:update', this.boundHandleUpdate);
+    this.engine.on('ar:marker', this.boundHandleMarker);
+    this.engine.on('ar:camera', this.boundHandleCamera);
     
     // Handle window resize
-    window.addEventListener('resize', this.handleResize.bind(this));
+    window.addEventListener('resize', this.boundHandleResize);
     
     console.log('[ThreeJSRendererPlugin] Enabled');
   }
@@ -89,13 +101,27 @@ export class ThreeJSRendererPlugin {
   disable() {
     if (!this.engine) return;
     
-    // Unsubscribe from engine events
-    this.engine.off('engine:update', this.handleUpdate.bind(this));
-    this.engine.off('ar:marker', this.handleMarker.bind(this));
-    this.engine.off('ar:camera', this.handleCamera.bind(this));
+    // Unsubscribe from engine events using stored bound references
+    if (this.boundHandleUpdate) {
+      this.engine.off('engine:update', this.boundHandleUpdate);
+    }
+    if (this.boundHandleMarker) {
+      this.engine.off('ar:marker', this.boundHandleMarker);
+    }
+    if (this.boundHandleCamera) {
+      this.engine.off('ar:camera', this.boundHandleCamera);
+    }
     
-    // Remove resize listener
-    window.removeEventListener('resize', this.handleResize.bind(this));
+    // Remove resize listener using stored bound reference
+    if (this.boundHandleResize) {
+      window.removeEventListener('resize', this.boundHandleResize);
+    }
+    
+    // Clear bound references
+    this.boundHandleUpdate = null;
+    this.boundHandleMarker = null;
+    this.boundHandleCamera = null;
+    this.boundHandleResize = null;
     
     // Remove renderer from DOM
     if (this.renderer && this.renderer.domElement && this.renderer.domElement.parentNode) {
