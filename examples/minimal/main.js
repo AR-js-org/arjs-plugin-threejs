@@ -103,8 +103,20 @@ async function bootstrap() {
         setStatus('Worker ready. You can start the webcam and load the marker.', 'success');
     };
 
+    // Event bus
+    const bus = engine.eventBus;
+
+    // DEBUG: log all eventBus emits
+    if (bus && typeof bus.emit === 'function') {
+        const _emit = bus.emit.bind(bus);
+        bus.emit = (name, payload) => {
+            //console.debug('[eventBus.emit]', name, payload);
+            return _emit(name, payload);
+        };
+    }
+
     // Event listeners before enabling
-    engine.eventBus.on('ar:workerReady', () => {
+   bus.on('ar:workerReady', () => {
         log('Worker ready');
         setStatus('Worker ready. You can start the webcam and load the marker.', 'success');
         //loadBtn.disabled = false;
@@ -113,22 +125,40 @@ async function bootstrap() {
             const proj = artoolkit?.getProjectionMatrix?.();
             const arr = proj?.toArray ? proj.toArray() : proj;
             if (Array.isArray(arr) && arr.length === 16) {
-                engine.eventBus.emit('ar:camera', { projectionMatrix: arr });
+               bus.emit('ar:camera', { projectionMatrix: arr });
             }
         } catch {}
     });
     //engine.eventBus.on('ar:ready', enableLoadBtn);
     //engine.eventBus.on('ar:initialized', enableLoadBtn);
-    engine.eventBus.on('ar:workerError', (e) => {
+   bus.on('ar:workerError', (e) => {
         log(`workerError: ${JSON.stringify(e)}`);
         setStatus('Worker error (see console)', 'error');
     });
 
-    engine.eventBus.on('ar:getMarker', (e) => console.log('[example] ar:getMarker', e));
+   bus.on('ar:getMarker', (e) => console.log('[example] ar:getMarker', e));
     // Marker events for logging only (the Three plugin manages anchors and visibility)
-    engine.eventBus.on('ar:markerFound', (d) => log(`markerFound: ${JSON.stringify(d)}`));
-    engine.eventBus.on('ar:markerUpdated', (d) => {/* too chatty for logs; uncomment if needed */});
-    engine.eventBus.on('ar:markerLost',   (d) => log(`markerLost: ${JSON.stringify(d)}`));
+   //bus.on('ar:markerFound', (d) => log(`markerFound: ${JSON.stringify(d)}`));
+   //bus.on('ar:markerUpdated', (d) => {/* too chatty for logs; uncomment if needed */});
+   //bus.on('ar:markerLost',   (d) => log(`markerLost: ${JSON.stringify(d)}`));
+    // Bridge legacy marker events => unified ar:marker for ThreeJSRendererPlugin
+    bus.on('ar:markerFound', (d) => {
+        bus.emit('ar:marker', {
+            id: d?.markerId ?? d?.id,
+            matrix: d?.matrix ?? d?.transformationMatrix,
+            visible: true,
+        });
+    });
+    bus.on('ar:markerUpdated', (d) => {
+        bus.emit('ar:marker', {
+            id: d?.markerId ?? d?.id,
+            matrix: d?.matrix ?? d?.transformationMatrix,
+            visible: true,
+        });
+    });
+    bus.on('ar:markerLost', (d) => {
+        bus.emit('ar:marker', { id: d?.markerId ?? d?.id, visible: false });
+    });
 
     // Enable core plugins
     ctx = engine.getContext();
@@ -140,8 +170,17 @@ async function bootstrap() {
         cameraParametersUrl: cameraParamsUrl,
         minConfidence: 0.6,
     });
-    await artoolkit.init(ctx);
-    await artoolkit.enable();
+    //await artoolkit.init(ctx);
+    //await artoolkit.enable();
+
+    try {
+        await artoolkit.init(ctx);
+        await artoolkit.enable();
+    } catch (e) {
+        console.error('[ArtoolkitPlugin] init/enable failed:', e);
+        setStatus('ARToolKit plugin failed to initialize (see console)', 'error');
+        return;
+    }
 
     // Three.js renderer plugin
     threePlugin = new ThreeJSRendererPlugin({
@@ -150,7 +189,7 @@ async function bootstrap() {
         antialias: true,
         preserveDrawingBuffer: false,
     });
-    await threePlugin.init(ctx);
+    await threePlugin.init(engine);
     await threePlugin.enable();
 
     // Start ECS loop (systems/plugins tick)
