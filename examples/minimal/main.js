@@ -192,6 +192,17 @@ async function bootstrap() {
     await threePlugin.init(engine);
     await threePlugin.enable();
 
+    const r = threePlugin.getRenderer();
+    if (r) {
+        // Force canvas to fill the viewport
+        r.domElement.style.position = 'absolute';
+        r.domElement.style.inset = '0';
+        r.domElement.style.width  = '100%';
+        r.domElement.style.height = '100%';
+        // use this line below for testing
+        // r.domElement.style.background = 'rgba(255,0,0,0.5)';
+    }
+
     // Start ECS loop (systems/plugins tick)
     engine.start();
 

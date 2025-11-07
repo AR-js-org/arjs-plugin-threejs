@@ -213,13 +213,14 @@ export class ThreeJSRendererPlugin {
    */
   handleResize() {
     if (!this.renderer || !this.camera) return;
-    
-    const width = window.innerWidth;
-    const height = window.innerHeight;
-    
-    this.renderer.setSize(width, height);
-    this.camera.aspect = width / height;
-    this.camera.updateProjectionMatrix();
+
+      // In ThreeJSRendererPlugin.handleResize()
+      const container = this.containerElement || document.body;
+      const width = container.clientWidth;
+      const height = container.clientHeight; // aspect-ratio style sets this automatically
+      this.renderer.setSize(width, height);
+      this.camera.aspect = width / height;
+      this.camera.updateProjectionMatrix();
   }
 
   /**

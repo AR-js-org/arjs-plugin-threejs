@@ -1,4 +1,4 @@
-import * as n from "three";
+import * as t from "three";
 class d {
   constructor(e = {}) {
     this.name = "threejs-renderer", this.engine = null, this.renderer = null, this.scene = null, this.camera = null, this.anchors = /* @__PURE__ */ new Map(), this.containerElement = null, this.boundHandleUpdate = null, this.boundHandleMarker = null, this.boundHandleCamera = null, this.boundHandleResize = null, this.options = {
@@ -11,10 +11,10 @@ class d {
    * Initialize the plugin with AR.js engine
    */
   init(e) {
-    this.core = e, this.renderer = new n.WebGLRenderer({
+    this.core = e, this.renderer = new t.WebGLRenderer({
       antialias: this.options.antialias,
       alpha: this.options.alpha
-    }), this.renderer.setPixelRatio(window.devicePixelRatio), this.renderer.setClearColor(0, 0), this.scene = new n.Scene(), this.camera = new n.PerspectiveCamera(
+    }), this.renderer.setPixelRatio(window.devicePixelRatio), this.renderer.setClearColor(0, 0), this.scene = new t.Scene(), this.camera = new t.PerspectiveCamera(
       60,
       window.innerWidth / window.innerHeight,
       0.1,
@@ -54,9 +54,9 @@ class d {
    * Handle marker event - create/update marker anchors
    */
   handleMarker(e) {
-    const { id: i, matrix: t, visible: a } = e;
-    let r = this.anchors.get(i);
-    r || (r = new n.Group(), r.name = `marker-${i}`, this.scene.add(r), this.anchors.set(i, r)), r.visible = a, t && Array.isArray(t) && (r.matrix.fromArray(t), r.matrix.decompose(r.position, r.quaternion, r.scale));
+    const { id: n, matrix: i, visible: a } = e;
+    let r = this.anchors.get(n);
+    r || (r = new t.Group(), r.name = `marker-${n}`, this.scene.add(r), this.anchors.set(n, r)), r.visible = a, i && Array.isArray(i) && (r.matrix.fromArray(i), r.matrix.decompose(r.position, r.quaternion, r.scale));
   }
   /**
    * Handle camera event - update camera projection
@@ -69,8 +69,8 @@ class d {
    */
   handleResize() {
     if (!this.renderer || !this.camera) return;
-    const e = window.innerWidth, i = window.innerHeight;
-    this.renderer.setSize(e, i), this.camera.aspect = e / i, this.camera.updateProjectionMatrix();
+    const e = this.containerElement || document.body, n = e.clientWidth, i = e.clientHeight;
+    this.renderer.setSize(n, i), this.camera.aspect = n / i, this.camera.updateProjectionMatrix();
   }
   /**
    * Set camera projection matrix from array (column-major 4x4)

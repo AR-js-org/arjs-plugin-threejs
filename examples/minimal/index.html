@@ -3,10 +3,9 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>AR.js Core ECS + ArtoolkitPlugin (CDN)</title>
+    <title>AR.js Core ECS + ArtoolkitPlugin + Three.js</title>
     <style>
-        html,
-        body {
+        html, body {
             margin: 0;
             height: 100%;
             background: #111;
@@ -58,6 +57,27 @@
             background: #3a1515;
             color: #ff9b9b;
         }
+        .viewport {
+            position: relative;
+            width: 100%;
+            max-width: 640px;
+            aspect-ratio: 4 / 3;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            margin: 12px 0;
+        }
+        .viewport video,
+        .viewport canvas {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+        .viewport video { z-index: 1; }
+        .viewport canvas { z-index: 2; pointer-events: none; }
         .log {
             background: #1b1b1b;
             border-radius: 6px;
@@ -67,32 +87,11 @@
             overflow: auto;
             font: 12px/1.4 monospace;
         }
-
-        /* New: video viewport styles */
-        .viewport {
-            width: 100%;
-            max-width: 640px;
-            aspect-ratio: 4 / 3; /* optional placeholder ratio */
-            background: #000;
-            border-radius: 8px;
-            overflow: hidden;
-            margin: 12px 0;
-        }
-        .viewport video {
-            display: block;
-            width: 100%;
-            height: auto;
-            position: relative !important;
-            top: 0 !important;
-            left: 0 !important;
-            z-index: 1 !important;
-            object-fit: cover;
-        }
     </style>
 </head>
 <body>
 <div class="container">
-    <h1>AR.js Core ECS + ArtoolkitPlugin</h1>
+    <h1>AR.js Core + Artoolkit + Three.js Renderer Plugin</h1>
     <p>Use the buttons to start/stop the webcam and load the HIRO pattern marker.</p>
 
     <div id="status" class="status">Initializing…</div>
@@ -103,7 +102,6 @@
         <button id="loadBtn" disabled>Load Marker</button>
     </div>
 
-    <!-- New: viewport where we will insert the video element -->
     <div id="viewport" class="viewport"></div>
 
     <h3>Event Log</h3>
