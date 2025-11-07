@@ -79,6 +79,9 @@ let threePlugin;
 let pumping = false;
 let cameraStarted = false;
 
+const cameraParamsUrl = new URL('./data/camera_para.dat', import.meta.url).href;
+const hiroUrl = new URL('./data/patt.hiro', import.meta.url).href;
+
 async function bootstrap() {
     engine = new Engine();
 
@@ -134,7 +137,7 @@ async function bootstrap() {
 
     // Tracking plugin
     artoolkit = new ArtoolkitPlugin({
-        cameraParametersUrl: '/examples/minimal/data/camera_para.dat',
+        cameraParametersUrl: cameraParamsUrl,
         minConfidence: 0.6,
     });
     await artoolkit.init(ctx);
@@ -237,8 +240,7 @@ async function loadMarker() {
         loadBtn.disabled = true;
         setStatus('Loading marker…', 'normal');
 
-        const patternUrl = '/examples/minimal/data/patt.hiro';
-        const res = await artoolkit.loadMarker(patternUrl, 1);
+        const res = await artoolkit.loadMarker(hiroUrl, 1);
         const markerId = res.markerId;
         log(`loadMarker result: ${JSON.stringify(res)}`);
         setStatus(`Marker loaded (id=${markerId}). Show the marker to the camera.`, 'success');
