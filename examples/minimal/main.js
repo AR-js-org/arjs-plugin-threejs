@@ -166,26 +166,13 @@ async function bootstrap() {
         }
     });
     // Marker events for logging only (the Three plugin manages anchors and visibility)
-   //bus.on('ar:markerFound', (d) => log(`markerFound: ${JSON.stringify(d)}`));
-   //bus.on('ar:markerUpdated', (d) => {/* too chatty for logs; uncomment if needed */});
-   //bus.on('ar:markerLost',   (d) => log(`markerLost: ${JSON.stringify(d)}`));
     // Bridge legacy marker events => unified ar:marker for ThreeJSRendererPlugin
     bus.on('ar:markerFound', (d) => {
-        // existing bridging
-        const id = String(d?.markerId ?? d?.id);
-        setTimeout(() => {
-            const anchor = threePlugin.getAnchor(id);
-            if (anchor && !anchor.userData._testAdded) {
-                anchor.userData._testAdded = true;
-                const testCube = new THREE.Mesh(
-                    new THREE.BoxGeometry(0.5, 0.5, 0.5),
-                    new THREE.MeshBasicMaterial({ color: 0xff00ff })
-                );
-                testCube.position.y = 0.25;
-                anchor.add(testCube);
-                console.log('[debug] Added test cube to anchor', id);
-            }
-        }, 0);
+        bus.emit('ar:marker', {
+            id: d?.markerId ?? d?.id,
+            matrix: d?.matrix ?? d?.transformationMatrix,
+            visible: true,
+        });
     });
     bus.on('ar:markerUpdated', (d) => {
         bus.emit('ar:marker', {
@@ -208,8 +195,6 @@ async function bootstrap() {
         cameraParametersUrl: cameraParamsUrl,
         minConfidence: 0.6,
     });
-    //await artoolkit.init(ctx);
-    //await artoolkit.enable();
 
     try {
         await artoolkit.init(ctx);
@@ -340,32 +325,7 @@ async function loadMarker() {
         const markerId = res.markerId;
         log(`loadMarker result: ${JSON.stringify(res)}`);
         setStatus(`Marker loaded (id=${markerId}). Show the marker to the camera.`, 'success');
-
-        // Demo content: add a cube to the plugin's anchor for this marker
-        if (threePlugin && typeof threePlugin.getAnchor === 'function') {
-            const anchorGroup = threePlugin.getAnchor(markerId);
-            if (anchorGroup && anchorGroup.children.length === 0) {
-                anchorGroup.visible = true;
-                const cube = new THREE.Mesh(
-                    new THREE.BoxGeometry(1, 1, 1),
-                    new THREE.MeshStandardMaterial({ color: 0x2d6cdf, metalness: 0.1, roughness: 0.8 })
-                );
-                cube.position.y = 0.5;
-
-                const hemi = new THREE.HemisphereLight(0xffffff, 0x222233, 1.0);
-                const plane = new THREE.Mesh(
-                    new THREE.PlaneGeometry(4, 4),
-                    new THREE.MeshStandardMaterial({ color: 0x444444, metalness: 0, roughness: 1 })
-                );
-                plane.rotation.x = -Math.PI / 2;
-
-                // Add lights to scene-level if plugin exposes scene; otherwise anchor is fine for quick demo
-                anchorGroup.add(hemi);
-                anchorGroup.add(plane);
-                anchorGroup.add(cube);
-                log(`Added demo content to anchor for marker ${markerId}`);
-            }
-        }
+        // Note: anchor content is added on ar:getMarker events.
     } catch (err) {
         log('loadMarker failed: ' + (err?.message || err));
         setStatus('Failed to load marker', 'error');
