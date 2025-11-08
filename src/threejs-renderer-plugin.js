@@ -4,11 +4,13 @@ import * as THREE from 'three';
  * Provides management of renderer, scene, camera and marker anchors.
  * Supported options: antialias, alpha, preferRAF, container, invertModelView, applyAxisFix
  */
+import * as THREE from 'three';
+
 export class ThreeJSRendererPlugin {
     constructor(options = {}) {
         this.name = 'threejs-renderer';
         this.engine = null;
-        this.emitter = null;
+        this.emitter = null; // engine.eventBus preferred
         this.renderer = null;
         this.scene = null;
         this.camera = null;
@@ -17,17 +19,23 @@ export class ThreeJSRendererPlugin {
         this.options = {
             antialias: options.antialias ?? true,
             alpha: options.alpha ?? true,
-            preferRAF: options.preferRAF ?? true,
-            container: options.container || null,
-            minConfidence: options.minConfidence ?? 0,
+            preferRAF: options.preferRAF ?? true,            // render even if engine:update absent
+            container: options.container || null,            // DOM node to mount canvas
+            minConfidence: options.minConfidence ?? 0,       // optional filter for e.marker.confidence
 
-            // Legacy AR.js transform chain
+            // Legacy AR.js transform chain (defaults match classic AR.js)
             useLegacyAxisChain: options.useLegacyAxisChain ?? true,
             changeMatrixMode: options.changeMatrixMode || 'modelViewMatrix',
 
             // Experimental (ignored if useLegacyAxisChain = true)
             invertModelView: options.invertModelView ?? false,
             applyAxisFix: options.applyAxisFix ?? false,
+
+            // NEW: Debug helpers (default off)
+            debugSceneAxes: options.debugSceneAxes ?? false,
+            sceneAxesSize: options.sceneAxesSize ?? 2,
+            debugAnchorAxes: options.debugAnchorAxes ?? false,
+            anchorAxesSize: options.anchorAxesSize ?? 0.5,
             ...options,
         };
 
@@ -105,7 +113,11 @@ export class ThreeJSRendererPlugin {
             this._rafId = requestAnimationFrame(loop);
         }
 
-        this.scene.add(new THREE.AxesHelper(2));
+        // Debug: scene axes (optional)
+        if (this.options.debugSceneAxes) {
+            this.scene.add(new THREE.AxesHelper(this.options.sceneAxesSize));
+        }
+
         console.log('[ThreeJSRendererPlugin] Enabled');
     }
 
@@ -178,7 +190,10 @@ export class ThreeJSRendererPlugin {
             anchor = new THREE.Group();
             anchor.name = `marker-${id}`;
             anchor.matrixAutoUpdate = false;
-            anchor.add(new THREE.AxesHelper(0.5));
+            // Debug: anchor axes (optional)
+            if (this.options.debugAnchorAxes) {
+                anchor.add(new THREE.AxesHelper(this.options.anchorAxesSize));
+            }
             this.scene.add(anchor);
             this.anchors.set(id, anchor);
             console.log('[ThreeJSRendererPlugin] anchor created', id);
@@ -191,7 +206,7 @@ export class ThreeJSRendererPlugin {
 
             let final;
             if (this.options.useLegacyAxisChain) {
-                // Legacy chain: projectionAxis * modelView * markerAxis
+                // Legacy chain: R_y(π) * R_z(π) * modelView * R_x(π/2)
                 const projectionAxis = new THREE.Matrix4()
                     .makeRotationY(Math.PI)
                     .multiply(new THREE.Matrix4().makeRotationZ(Math.PI));

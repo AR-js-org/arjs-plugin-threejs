@@ -52,8 +52,8 @@ await engine.pluginManager.enable(webcamPlugin.id, ctx);
 // 2) Initialize the Artoolkit tracking plugin (import path per your project)
 const { ArtoolkitPlugin } = await import('./vendor/arjs-plugin-artoolkit/arjs-plugin-artoolkit.esm.js');
 const artoolkit = new ArtoolkitPlugin({
-  cameraParametersUrl: '/path/to/camera_para.dat',
-  minConfidence: 0.6,
+    cameraParametersUrl: '/path/to/camera_para.dat',
+    minConfidence: 0.6,
 });
 await artoolkit.init(ctx);
 await artoolkit.enable();
@@ -62,15 +62,20 @@ await artoolkit.enable();
 const proj = artoolkit.getProjectionMatrix?.();
 const arr = proj?.toArray ? proj.toArray() : proj;
 if (Array.isArray(arr) && arr.length === 16) {
-  engine.eventBus.emit('ar:camera', { projectionMatrix: arr });
+    engine.eventBus.emit('ar:camera', { projectionMatrix: arr });
 }
 
-// 4) Mount the Three.js renderer plugin
+// 4) Mount Three.js renderer plugin
 const threePlugin = new ThreeJSRendererPlugin({
-  container: document.getElementById('viewport'),
-  useLegacyAxisChain: true,
-  changeMatrixMode: 'modelViewMatrix',
-  preferRAF: true,
+    container: document.getElementById('viewport'),
+    useLegacyAxisChain: true,
+    changeMatrixMode: 'modelViewMatrix',
+    preferRAF: true,
+    // Debug (optional; defaults off):
+    // debugSceneAxes: true,
+    // sceneAxesSize: 2,
+    // debugAnchorAxes: true,
+    // anchorAxesSize: 0.5,
 });
 await threePlugin.init(engine);
 await threePlugin.enable();
@@ -80,8 +85,8 @@ engine.start();
 ```
 
 Notes:
-- The example app also starts the webcam and attaches the `<video>` into a `#viewport` container; keep your Three.js canvas layered above (z-index).
-- Anchors (marker Groups) are created lazily when the first pose event arrives for a marker; add content when you receive a marker event (see “Anchors and how to add content”).
+- Start the webcam and attach the `<video>` element into your viewport with z-index below the Three.js canvas.
+- Anchors (marker Groups) are created lazily when the first pose event arrives; add content when you receive a marker event (see below).
 
 ## Events handled
 
@@ -105,14 +110,33 @@ Constructor options (selected):
 - `container` (HTMLElement): DOM node where the Three.js canvas mounts. Default: `document.body`.
 - `preferRAF` (boolean): Render via RAF even if the engine doesn’t emit `engine:update`. Default: `true`.
 - `minConfidence` (number): If `ar:getMarker` contains `marker.confidence`, ignore events below this threshold. Default: `0`.
-- `useLegacyAxisChain` (boolean): Apply classic AR.js transform chain. Default: `true`.
+- `useLegacyAxisChain` (boolean): Apply a classic AR.js transform chain. Default: `true`.
 - `changeMatrixMode` ('modelViewMatrix' | 'cameraTransformMatrix'): Matches classic AR.js behavior. Default: `'modelViewMatrix'`.
+- Debug helpers (all default to `false` unless sizes; helpful while integrating):
+    - `debugSceneAxes` (boolean): Show a `THREE.AxesHelper` at scene origin.
+    - `sceneAxesSize` (number): Size of scene axes helper (default `2`).
+    - `debugAnchorAxes` (boolean): Show a `THREE.AxesHelper` on each created anchor.
+    - `anchorAxesSize` (number): Size of anchor axes helper (default `0.5`).
 
 Classic AR.js transform chain (default):
 ```
 finalMatrix = R_y(π) * R_z(π) * modelViewMatrix * R_x(π/2)
 ```
 If `changeMatrixMode === 'cameraTransformMatrix'`, `finalMatrix` is inverted before applying to the anchor.
+
+## Camera projection
+
+For correct perspective, emit a camera projection matrix at least once:
+
+```js
+const proj = artoolkit.getProjectionMatrix();         // from your Artoolkit plugin
+const arr = proj?.toArray ? proj.toArray() : proj;    // ensure 16 numbers
+if (Array.isArray(arr) && arr.length === 16) {
+  engine.eventBus.emit('ar:camera', { projectionMatrix: arr });
+}
+```
+
+The plugin will log “Projection applied” when it sets the camera.
 
 ## Anchors and how to add content
 
@@ -151,9 +175,10 @@ engine.eventBus.on('ar:getMarker', (d) => {
 });
 ```
 
-Tip:
+Tips:
+- Use `debugSceneAxes` and/or `debugAnchorAxes` during integration.
 - Keep your viewport container with `position: relative` and a fixed aspect ratio.
-- Style `<video>` at z-index: 1 and the Three.js `<canvas>` at z-index: 2 so the 3D overlay shows above the camera feed.
+- Style `<video>` at `z-index: 1` and the Three.js `<canvas>` at `z-index: 2`.
 
 ## License
 
