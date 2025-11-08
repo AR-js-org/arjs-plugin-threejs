@@ -36,7 +36,7 @@ function setStatus(msg, type = 'normal') {
     if (type === 'error') statusEl.classList.add('error');
 }
 
-// Attach webcam <video> into viewport without removing other children (like the Three.js canvas)
+// Attach webcam <video> into the viewport without removing other children (like the Three.js canvas)
 function attachVideoToViewport(ctx) {
     const frameSource = CaptureSystem.getFrameSource(ctx);
     const videoEl = frameSource?.element;
@@ -136,18 +136,56 @@ async function bootstrap() {
         setStatus('Worker error (see console)', 'error');
     });
 
-   bus.on('ar:getMarker', (e) => console.log('[example] ar:getMarker', e));
+    bus.on('ar:getMarker', (d) => {
+        //const id = String(extractMarkerId(d));
+        const id = String(
+            d?.marker?.markerId ??
+            d?.marker?.id ??
+            d?.marker?.pattHandle ??
+            d?.marker?.uid ??
+            d?.marker?.index ??
+            '0'
+        );
+        setTimeout(() => {
+            const anchor = threePlugin.getAnchor(id);
+            if (anchor && !anchor.userData._content) {
+                anchor.userData._content = true;
+                const cube = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.5,0.5,0.5),
+                    new THREE.MeshBasicMaterial({ color: 0xff00ff })
+                );
+                cube.position.y = 0.25;
+                anchor.add(cube);
+                console.log('[example] Added cube to anchor', id);
+            }
+        }, 0);
+
+        const matrix = d?.matrix;
+        if (Array.isArray(matrix) && matrix.length === 16) {
+            bus.emit('ar:marker', { id, matrix, visible: true, source: 'bridge:getMarker' });
+        }
+    });
     // Marker events for logging only (the Three plugin manages anchors and visibility)
    //bus.on('ar:markerFound', (d) => log(`markerFound: ${JSON.stringify(d)}`));
    //bus.on('ar:markerUpdated', (d) => {/* too chatty for logs; uncomment if needed */});
    //bus.on('ar:markerLost',   (d) => log(`markerLost: ${JSON.stringify(d)}`));
     // Bridge legacy marker events => unified ar:marker for ThreeJSRendererPlugin
     bus.on('ar:markerFound', (d) => {
-        bus.emit('ar:marker', {
-            id: d?.markerId ?? d?.id,
-            matrix: d?.matrix ?? d?.transformationMatrix,
-            visible: true,
-        });
+        // existing bridging
+        const id = String(d?.markerId ?? d?.id);
+        setTimeout(() => {
+            const anchor = threePlugin.getAnchor(id);
+            if (anchor && !anchor.userData._testAdded) {
+                anchor.userData._testAdded = true;
+                const testCube = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.5, 0.5, 0.5),
+                    new THREE.MeshBasicMaterial({ color: 0xff00ff })
+                );
+                testCube.position.y = 0.25;
+                anchor.add(testCube);
+                console.log('[debug] Added test cube to anchor', id);
+            }
+        }, 0);
     });
     bus.on('ar:markerUpdated', (d) => {
         bus.emit('ar:marker', {
@@ -188,6 +226,9 @@ async function bootstrap() {
         alpha: true,               // transparent canvas over video
         antialias: true,
         preserveDrawingBuffer: false,
+        useLegacyAxisChain: true,
+        changeMatrixMode: 'modelViewMatrix', // or 'cameraTransformMatrix'
+        preferRAF: true
     });
     await threePlugin.init(engine);
     await threePlugin.enable();
@@ -202,6 +243,11 @@ async function bootstrap() {
         // use this line below for testing
         // r.domElement.style.background = 'rgba(255,0,0,0.5)';
     }
+
+    const cam = threePlugin.getCamera();
+    cam.near = 0.01;
+    cam.far = 5000;
+    cam.updateProjectionMatrix();
 
     // Start ECS loop (systems/plugins tick)
     engine.start();
@@ -299,6 +345,7 @@ async function loadMarker() {
         if (threePlugin && typeof threePlugin.getAnchor === 'function') {
             const anchorGroup = threePlugin.getAnchor(markerId);
             if (anchorGroup && anchorGroup.children.length === 0) {
+                anchorGroup.visible = true;
                 const cube = new THREE.Mesh(
                     new THREE.BoxGeometry(1, 1, 1),
                     new THREE.MeshStandardMaterial({ color: 0x2d6cdf, metalness: 0.1, roughness: 0.8 })

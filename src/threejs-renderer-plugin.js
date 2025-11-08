@@ -1,266 +1,251 @@
 import * as THREE from 'three';
-
 /**
- * ThreeJSRendererPlugin - Minimal Three.js renderer plugin for AR.js-core
- * 
- * Lifecycle:
- * - init: create renderer, scene, camera
- * - enable: attach renderer to DOM, subscribe to events
- * - disable: remove event listeners
- * - dispose: cleanup Three.js resources
+ * Plugin to render THREE.js scenes driven by AR markers.
+ * Provides management of renderer, scene, camera and marker anchors.
+ * Supported options: antialias, alpha, preferRAF, container, invertModelView, applyAxisFix
  */
 export class ThreeJSRendererPlugin {
-  constructor(options = {}) {
-    this.name = 'threejs-renderer';
-    this.engine = null;
-    this.renderer = null;
-    this.scene = null;
-    this.camera = null;
-    this.anchors = new Map();
-    this.containerElement = null;
-    
-    // Store bound event handlers for proper removal
-    this.boundHandleUpdate = null;
-    this.boundHandleMarker = null;
-    this.boundHandleCamera = null;
-    this.boundHandleResize = null;
-    
-    // Store options
-    this.options = {
-      antialias: options.antialias !== undefined ? options.antialias : true,
-      alpha: options.alpha !== undefined ? options.alpha : true,
-      ...options
-    };
-  }
+    constructor(options = {}) {
+        this.name = 'threejs-renderer';
+        this.engine = null;
+        this.emitter = null;
+        this.renderer = null;
+        this.scene = null;
+        this.camera = null;
+        this.anchors = new Map();
 
-  /**
-   * Initialize the plugin with AR.js engine
-   */
-  init(core) {
-    this.core = core;
-    
-    // Create Three.js renderer
-    this.renderer = new THREE.WebGLRenderer({
-      antialias: this.options.antialias,
-      alpha: this.options.alpha
-    });
-    this.renderer.setPixelRatio(window.devicePixelRatio);
-    this.renderer.setClearColor(0x000000, 0);
-    
-    // Create scene
-    this.scene = new THREE.Scene();
-    
-    // Create camera (AR camera will be configured on ar:camera event)
-    this.camera = new THREE.PerspectiveCamera(
-      60,
-      window.innerWidth / window.innerHeight,
-      0.1,
-      1000
-    );
-    this.camera.position.set(0, 0, 0);
-    
-    console.log('[ThreeJSRendererPlugin] Initialized');
-  }
+        this.options = {
+            antialias: options.antialias ?? true,
+            alpha: options.alpha ?? true,
+            preferRAF: options.preferRAF ?? true,
+            container: options.container || null,
+            minConfidence: options.minConfidence ?? 0,
 
-  /**
-   * Enable the plugin (attach to DOM and subscribe to events)
-   */
-  enable() {
-    if (!this.core) {
-      throw new Error('Plugin must be initialized before enabling');
+            // Legacy AR.js transform chain
+            useLegacyAxisChain: options.useLegacyAxisChain ?? true,
+            changeMatrixMode: options.changeMatrixMode || 'modelViewMatrix',
+
+            // Experimental (ignored if useLegacyAxisChain = true)
+            invertModelView: options.invertModelView ?? false,
+            applyAxisFix: options.applyAxisFix ?? false,
+            ...options,
+        };
+
+        this._rafId = 0;
+
+        // For experimental path only
+        this._axisFix = new THREE.Matrix4()
+            .makeRotationY(Math.PI)
+            .multiply(new THREE.Matrix4().makeRotationZ(Math.PI));
     }
 
-    // Attach renderer to container element or body
-    const container = this.options.container || document.body;
-    this.containerElement = container;
-    container.appendChild(this.renderer.domElement);
-    
-    // Set initial size
-    this.handleResize();
-    
-    // Bind event handlers once and store references
-    this.boundHandleUpdate = this.handleUpdate.bind(this);
-    this.boundHandleMarker = this.handleMarker.bind(this);
-    this.boundHandleCamera = this.handleCamera.bind(this);
-    this.boundHandleResize = this.handleResize.bind(this);
-    
-    // Subscribe to engine events
-    this.core.eventBus.on('engine:update', this.boundHandleUpdate);
-    this.core.eventBus.on('ar:marker', this.boundHandleMarker);
-    this.core.eventBus.on('ar:camera', this.boundHandleCamera);
-    
-    // Handle window resize
-    window.addEventListener('resize', this.boundHandleResize);
-    
-    console.log('[ThreeJSRendererPlugin] Enabled');
-  }
+    init(engine) {
+        this.engine = engine;
+        this.emitter = engine?.eventBus || engine;
 
-  /**
-   * Disable the plugin (remove event listeners)
-   */
-  disable() {
-    if (!this.core) return;
-    
-    // Unsubscribe from engine events using stored bound references
-    if (this.boundHandleUpdate) {
-      this.core.off('engine:update', this.boundHandleUpdate);
-    }
-    if (this.boundHandleMarker) {
-      this.core.off('ar:marker', this.boundHandleMarker);
-    }
-    if (this.boundHandleCamera) {
-      this.core.off('ar:camera', this.boundHandleCamera);
-    }
-    
-    // Remove resize listener using stored bound reference
-    if (this.boundHandleResize) {
-      window.removeEventListener('resize', this.boundHandleResize);
-    }
-    
-    // Clear bound references
-    this.boundHandleUpdate = null;
-    this.boundHandleMarker = null;
-    this.boundHandleCamera = null;
-    this.boundHandleResize = null;
-    
-    // Remove renderer from DOM
-    if (this.renderer && this.renderer.domElement && this.renderer.domElement.parentNode) {
-      this.renderer.domElement.parentNode.removeChild(this.renderer.domElement);
-    }
-    
-    console.log('[ThreeJSRendererPlugin] Disabled');
-  }
+        this.renderer = new THREE.WebGLRenderer({
+            antialias: this.options.antialias,
+            alpha: this.options.alpha,
+            preserveDrawingBuffer: false,
+        });
+        this.renderer.setPixelRatio(window.devicePixelRatio);
+        this.renderer.setClearColor(0x000000, 0);
 
-  /**
-   * Dispose and cleanup all resources
-   */
-  dispose() {
-    this.disable();
-    
-    // Clear anchors
-    this.anchors.forEach((anchor) => {
-      if (anchor.parent) {
-        anchor.parent.remove(anchor);
-      }
-    });
-    this.anchors.clear();
-    
-    // Dispose Three.js resources
-    if (this.renderer) {
-      this.renderer.dispose();
-      this.renderer = null;
+        this.scene = new THREE.Scene();
+        this.camera = new THREE.PerspectiveCamera(60, 1, 0.01, 2000);
+
+        // Lighting
+        this.scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+        const dir = new THREE.DirectionalLight(0xffffff, 0.6);
+        dir.position.set(1, 1, 1);
+        this.scene.add(dir);
+
+        console.log('[ThreeJSRendererPlugin] Initialized', { hasEventBus: !!engine?.eventBus });
     }
-    
-    if (this.scene) {
-      this.scene = null;
+
+    enable() {
+        const container = this.options.container || document.body;
+        container.appendChild(this.renderer.domElement);
+        this._resizeToContainer(container);
+
+        Object.assign(this.renderer.domElement.style, {
+            position: 'absolute',
+            inset: '0',
+            width: '100%',
+            height: '100%',
+            zIndex: '2',
+            display: 'block',
+            pointerEvents: 'none',
+        });
+
+        this._onUpdate = () => this.handleUpdate();
+        this._onMarker = (e) => this.handleUnifiedMarker(e);
+        this._onGetMarker = (e) => this.handleRawGetMarker(e);
+        this._onCamera = (e) => this.handleCamera(e);
+        this._onLegacyFound = (d) => this.handleUnifiedMarker(this._adaptLegacy(d, true));
+        this._onLegacyUpdated = (d) => this.handleUnifiedMarker(this._adaptLegacy(d, true));
+        this._onLegacyLost = (d) => this.handleUnifiedMarker(this._adaptLegacy(d, false));
+        this._onResize = () => this.handleResize();
+
+        this._sub('engine:update', this._onUpdate);
+        this._sub('ar:marker', this._onMarker);
+        this._sub('ar:getMarker', this._onGetMarker);
+        this._sub('ar:camera', this._onCamera);
+        this._sub('ar:markerFound', this._onLegacyFound);
+        this._sub('ar:markerUpdated', this._onLegacyUpdated);
+        this._sub('ar:markerLost', this._onLegacyLost);
+
+        window.addEventListener('resize', this._onResize);
+
+        if (this.options.preferRAF) {
+            const loop = () => {
+                this._rafId = requestAnimationFrame(loop);
+                this.handleUpdate();
+            };
+            this._rafId = requestAnimationFrame(loop);
+        }
+
+        this.scene.add(new THREE.AxesHelper(2));
+        console.log('[ThreeJSRendererPlugin] Enabled');
     }
-    
-    if (this.camera) {
-      this.camera = null;
+
+    disable() {
+        if (this.emitter?.off) {
+            this._off('engine:update', this._onUpdate);
+            this._off('ar:marker', this._onMarker);
+            this._off('ar:getMarker', this._onGetMarker);
+            this._off('ar:camera', this._onCamera);
+            this._off('ar:markerFound', this._onLegacyFound);
+            this._off('ar:markerUpdated', this._onLegacyUpdated);
+            this._off('ar:markerLost', this._onLegacyLost);
+        }
+        window.removeEventListener('resize', this._onResize);
+        if (this._rafId) cancelAnimationFrame(this._rafId);
+        this._rafId = 0;
+        if (this.renderer?.domElement?.parentNode) {
+            this.renderer.domElement.parentNode.removeChild(this.renderer.domElement);
+        }
+        console.log('[ThreeJSRendererPlugin] Disabled');
     }
-    
-    this.core = null;
-    
-    console.log('[ThreeJSRendererPlugin] Disposed');
-  }
 
-  /**
-   * Handle engine update event - render the scene
-   */
-  handleUpdate() {
-    if (this.renderer && this.scene && this.camera) {
-      this.renderer.render(this.scene, this.camera);
+    dispose() {
+        this.disable();
+        this.anchors.forEach(a => a.parent?.remove(a));
+        this.anchors.clear();
+        this.renderer?.dispose();
+        this.renderer = null;
+        this.scene = null;
+        this.camera = null;
+        this.engine = null;
+        this.emitter = null;
+        console.log('[ThreeJSRendererPlugin] Disposed');
     }
-  }
 
-  /**
-   * Handle marker event - create/update marker anchors
-   */
-  handleMarker(event) {
-    const { id, matrix, visible } = event;
-    
-    let anchor = this.anchors.get(id);
-    
-    if (!anchor) {
-      // Create new anchor (Group) for this marker
-      anchor = new THREE.Group();
-      anchor.name = `marker-${id}`;
-      this.scene.add(anchor);
-      this.anchors.set(id, anchor);
+    _sub(ev, fn) { try { this.emitter?.on?.(ev, fn); } catch {} }
+    _off(ev, fn) { try { this.emitter?.off?.(ev, fn); } catch {} }
+
+    _adaptLegacy(d, visible) {
+        return {
+            id: String(d?.markerId ?? d?.id ?? '0'),
+            matrix: d?.matrix || d?.transformationMatrix || d?.modelViewMatrix || d?.poseMatrix || null,
+            visible,
+            _legacy: true,
+        };
     }
-    
-    // Update visibility
-    anchor.visible = visible;
-    
-    // Update transform matrix if provided
-    if (matrix && Array.isArray(matrix)) {
-      anchor.matrix.fromArray(matrix);
-      anchor.matrix.decompose(anchor.position, anchor.quaternion, anchor.scale);
+
+    handleRawGetMarker(e) {
+        if (!e) return;
+        const confidence = e?.marker?.confidence;
+        if (confidence !== undefined && confidence < this.options.minConfidence) return;
+        const id = String(
+            e?.marker?.markerId ??
+            e?.marker?.id ??
+            e?.marker?.pattHandle ??
+            e?.marker?.uid ??
+            e?.marker?.index ??
+            '0'
+        );
+        const matrix = e?.matrix;
+        this.handleUnifiedMarker({ id, matrix, visible: true, _source: 'ar:getMarker' });
     }
-  }
 
-  /**
-   * Handle camera event - update camera projection
-   */
-  handleCamera(event) {
-    if (event.projectionMatrix && Array.isArray(event.projectionMatrix)) {
-      this.setProjectionFromArray(event.projectionMatrix);
+    handleUnifiedMarker(evt) {
+        const { id, matrix, visible } = evt || {};
+        if (id == null) return;
+
+        let anchor = this.anchors.get(id);
+        if (!anchor) {
+            anchor = new THREE.Group();
+            anchor.name = `marker-${id}`;
+            anchor.matrixAutoUpdate = false;
+            anchor.add(new THREE.AxesHelper(0.5));
+            this.scene.add(anchor);
+            this.anchors.set(id, anchor);
+            console.log('[ThreeJSRendererPlugin] anchor created', id);
+        }
+
+        if (typeof visible === 'boolean') anchor.visible = visible;
+
+        if (Array.isArray(matrix) && matrix.length === 16) {
+            const modelView = new THREE.Matrix4().fromArray(matrix);
+
+            let final;
+            if (this.options.useLegacyAxisChain) {
+                // Legacy chain: projectionAxis * modelView * markerAxis
+                const projectionAxis = new THREE.Matrix4()
+                    .makeRotationY(Math.PI)
+                    .multiply(new THREE.Matrix4().makeRotationZ(Math.PI));
+                const markerAxis = new THREE.Matrix4().makeRotationX(Math.PI / 2);
+                final = new THREE.Matrix4()
+                    .copy(projectionAxis)
+                    .multiply(modelView)
+                    .multiply(markerAxis);
+
+                if (this.options.changeMatrixMode === 'cameraTransformMatrix') {
+                    final.invert();
+                }
+            } else {
+                // Experimental path
+                final = modelView.clone();
+                if (this.options.invertModelView) final.invert();
+                if (this.options.applyAxisFix) final.multiply(this._axisFix);
+            }
+
+            anchor.matrix.copy(final);
+            anchor.matrix.decompose(anchor.position, anchor.quaternion, anchor.scale);
+        }
     }
-  }
 
-  /**
-   * Handle window resize
-   */
-  handleResize() {
-    if (!this.renderer || !this.camera) return;
-
-      // In ThreeJSRendererPlugin.handleResize()
-      const container = this.containerElement || document.body;
-      const width = container.clientWidth;
-      const height = container.clientHeight; // aspect-ratio style sets this automatically
-      this.renderer.setSize(width, height);
-      this.camera.aspect = width / height;
-      this.camera.updateProjectionMatrix();
-  }
-
-  /**
-   * Set camera projection matrix from array (column-major 4x4)
-   */
-  setProjectionFromArray(array) {
-    if (!this.camera || !Array.isArray(array) || array.length !== 16) {
-      console.warn('[ThreeJSRendererPlugin] Invalid projection matrix');
-      return;
+    handleCamera(e) {
+        const arr = e?.projectionMatrix || e?.matrix;
+        if (Array.isArray(arr) && arr.length === 16) {
+            this.camera.projectionMatrix.fromArray(arr);
+            this.camera.projectionMatrixInverse.copy(this.camera.projectionMatrix).invert();
+            console.log('[ThreeJSRendererPlugin] Projection applied');
+        }
     }
-    
-    this.camera.projectionMatrix.fromArray(array);
-    this.camera.projectionMatrixInverse.copy(this.camera.projectionMatrix).invert();
-  }
 
-  /**
-   * Get Three.js scene for adding custom objects
-   */
-  getScene() {
-    return this.scene;
-  }
+    handleUpdate() {
+        if (this.renderer && this.scene && this.camera) {
+            this.renderer.render(this.scene, this.camera);
+        }
+    }
 
-  /**
-   * Get Three.js camera
-   */
-  getCamera() {
-    return this.camera;
-  }
+    handleResize() {
+        const container = this.options.container || document.body;
+        this._resizeToContainer(container);
+    }
 
-  /**
-   * Get Three.js renderer
-   */
-  getRenderer() {
-    return this.renderer;
-  }
+    _resizeToContainer(container) {
+        const w = container.clientWidth || window.innerWidth;
+        const h = container.clientHeight || Math.round(w * 3 / 4);
+        this.renderer.setSize(w, h);
+        this.camera.aspect = w / h;
+        this.camera.updateProjectionMatrix();
+    }
 
-  /**
-   * Get anchor by marker ID
-   */
-  getAnchor(markerId) {
-    return this.anchors.get(markerId);
-  }
+    getAnchor(id) { return this.anchors.get(String(id)); }
+    getScene() { return this.scene; }
+    getCamera() { return this.camera; }
+    getRenderer() { return this.renderer; }
 }

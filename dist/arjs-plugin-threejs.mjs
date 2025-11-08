@@ -1,113 +1,127 @@
 import * as t from "three";
-class d {
+class c {
   constructor(e = {}) {
-    this.name = "threejs-renderer", this.engine = null, this.renderer = null, this.scene = null, this.camera = null, this.anchors = /* @__PURE__ */ new Map(), this.containerElement = null, this.boundHandleUpdate = null, this.boundHandleMarker = null, this.boundHandleCamera = null, this.boundHandleResize = null, this.options = {
-      antialias: e.antialias !== void 0 ? e.antialias : !0,
-      alpha: e.alpha !== void 0 ? e.alpha : !0,
+    this.name = "threejs-renderer", this.engine = null, this.emitter = null, this.renderer = null, this.scene = null, this.camera = null, this.anchors = /* @__PURE__ */ new Map(), this.options = {
+      antialias: e.antialias ?? !0,
+      alpha: e.alpha ?? !0,
+      preferRAF: e.preferRAF ?? !0,
+      container: e.container || null,
+      minConfidence: e.minConfidence ?? 0,
+      // Legacy AR.js transform chain
+      useLegacyAxisChain: e.useLegacyAxisChain ?? !0,
+      changeMatrixMode: e.changeMatrixMode || "modelViewMatrix",
+      // Experimental (ignored if useLegacyAxisChain = true)
+      invertModelView: e.invertModelView ?? !1,
+      applyAxisFix: e.applyAxisFix ?? !1,
       ...e
+    }, this._rafId = 0, this._axisFix = new t.Matrix4().makeRotationY(Math.PI).multiply(new t.Matrix4().makeRotationZ(Math.PI));
+  }
+  init(e) {
+    this.engine = e, this.emitter = e?.eventBus || e, this.renderer = new t.WebGLRenderer({
+      antialias: this.options.antialias,
+      alpha: this.options.alpha,
+      preserveDrawingBuffer: !1
+    }), this.renderer.setPixelRatio(window.devicePixelRatio), this.renderer.setClearColor(0, 0), this.scene = new t.Scene(), this.camera = new t.PerspectiveCamera(60, 1, 0.01, 2e3), this.scene.add(new t.AmbientLight(16777215, 0.6));
+    const i = new t.DirectionalLight(16777215, 0.6);
+    i.position.set(1, 1, 1), this.scene.add(i), console.log("[ThreeJSRendererPlugin] Initialized", { hasEventBus: !!e?.eventBus });
+  }
+  enable() {
+    const e = this.options.container || document.body;
+    if (e.appendChild(this.renderer.domElement), this._resizeToContainer(e), Object.assign(this.renderer.domElement.style, {
+      position: "absolute",
+      inset: "0",
+      width: "100%",
+      height: "100%",
+      zIndex: "2",
+      display: "block",
+      pointerEvents: "none"
+    }), this._onUpdate = () => this.handleUpdate(), this._onMarker = (i) => this.handleUnifiedMarker(i), this._onGetMarker = (i) => this.handleRawGetMarker(i), this._onCamera = (i) => this.handleCamera(i), this._onLegacyFound = (i) => this.handleUnifiedMarker(this._adaptLegacy(i, !0)), this._onLegacyUpdated = (i) => this.handleUnifiedMarker(this._adaptLegacy(i, !0)), this._onLegacyLost = (i) => this.handleUnifiedMarker(this._adaptLegacy(i, !1)), this._onResize = () => this.handleResize(), this._sub("engine:update", this._onUpdate), this._sub("ar:marker", this._onMarker), this._sub("ar:getMarker", this._onGetMarker), this._sub("ar:camera", this._onCamera), this._sub("ar:markerFound", this._onLegacyFound), this._sub("ar:markerUpdated", this._onLegacyUpdated), this._sub("ar:markerLost", this._onLegacyLost), window.addEventListener("resize", this._onResize), this.options.preferRAF) {
+      const i = () => {
+        this._rafId = requestAnimationFrame(i), this.handleUpdate();
+      };
+      this._rafId = requestAnimationFrame(i);
+    }
+    this.scene.add(new t.AxesHelper(2)), console.log("[ThreeJSRendererPlugin] Enabled");
+  }
+  disable() {
+    this.emitter?.off && (this._off("engine:update", this._onUpdate), this._off("ar:marker", this._onMarker), this._off("ar:getMarker", this._onGetMarker), this._off("ar:camera", this._onCamera), this._off("ar:markerFound", this._onLegacyFound), this._off("ar:markerUpdated", this._onLegacyUpdated), this._off("ar:markerLost", this._onLegacyLost)), window.removeEventListener("resize", this._onResize), this._rafId && cancelAnimationFrame(this._rafId), this._rafId = 0, this.renderer?.domElement?.parentNode && this.renderer.domElement.parentNode.removeChild(this.renderer.domElement), console.log("[ThreeJSRendererPlugin] Disabled");
+  }
+  dispose() {
+    this.disable(), this.anchors.forEach((e) => e.parent?.remove(e)), this.anchors.clear(), this.renderer?.dispose(), this.renderer = null, this.scene = null, this.camera = null, this.engine = null, this.emitter = null, console.log("[ThreeJSRendererPlugin] Disposed");
+  }
+  _sub(e, i) {
+    try {
+      this.emitter?.on?.(e, i);
+    } catch {
+    }
+  }
+  _off(e, i) {
+    try {
+      this.emitter?.off?.(e, i);
+    } catch {
+    }
+  }
+  _adaptLegacy(e, i) {
+    return {
+      id: String(e?.markerId ?? e?.id ?? "0"),
+      matrix: e?.matrix || e?.transformationMatrix || e?.modelViewMatrix || e?.poseMatrix || null,
+      visible: i,
+      _legacy: !0
     };
   }
-  /**
-   * Initialize the plugin with AR.js engine
-   */
-  init(e) {
-    this.core = e, this.renderer = new t.WebGLRenderer({
-      antialias: this.options.antialias,
-      alpha: this.options.alpha
-    }), this.renderer.setPixelRatio(window.devicePixelRatio), this.renderer.setClearColor(0, 0), this.scene = new t.Scene(), this.camera = new t.PerspectiveCamera(
-      60,
-      window.innerWidth / window.innerHeight,
-      0.1,
-      1e3
-    ), this.camera.position.set(0, 0, 0), console.log("[ThreeJSRendererPlugin] Initialized");
+  handleRawGetMarker(e) {
+    if (!e) return;
+    const i = e?.marker?.confidence;
+    if (i !== void 0 && i < this.options.minConfidence) return;
+    const a = String(
+      e?.marker?.markerId ?? e?.marker?.id ?? e?.marker?.pattHandle ?? e?.marker?.uid ?? e?.marker?.index ?? "0"
+    ), s = e?.matrix;
+    this.handleUnifiedMarker({ id: a, matrix: s, visible: !0, _source: "ar:getMarker" });
   }
-  /**
-   * Enable the plugin (attach to DOM and subscribe to events)
-   */
-  enable() {
-    if (!this.core)
-      throw new Error("Plugin must be initialized before enabling");
-    const e = this.options.container || document.body;
-    this.containerElement = e, e.appendChild(this.renderer.domElement), this.handleResize(), this.boundHandleUpdate = this.handleUpdate.bind(this), this.boundHandleMarker = this.handleMarker.bind(this), this.boundHandleCamera = this.handleCamera.bind(this), this.boundHandleResize = this.handleResize.bind(this), this.core.eventBus.on("engine:update", this.boundHandleUpdate), this.core.eventBus.on("ar:marker", this.boundHandleMarker), this.core.eventBus.on("ar:camera", this.boundHandleCamera), window.addEventListener("resize", this.boundHandleResize), console.log("[ThreeJSRendererPlugin] Enabled");
+  handleUnifiedMarker(e) {
+    const { id: i, matrix: a, visible: s } = e || {};
+    if (i == null) return;
+    let r = this.anchors.get(i);
+    if (r || (r = new t.Group(), r.name = `marker-${i}`, r.matrixAutoUpdate = !1, r.add(new t.AxesHelper(0.5)), this.scene.add(r), this.anchors.set(i, r), console.log("[ThreeJSRendererPlugin] anchor created", i)), typeof s == "boolean" && (r.visible = s), Array.isArray(a) && a.length === 16) {
+      const o = new t.Matrix4().fromArray(a);
+      let n;
+      if (this.options.useLegacyAxisChain) {
+        const h = new t.Matrix4().makeRotationY(Math.PI).multiply(new t.Matrix4().makeRotationZ(Math.PI)), d = new t.Matrix4().makeRotationX(Math.PI / 2);
+        n = new t.Matrix4().copy(h).multiply(o).multiply(d), this.options.changeMatrixMode === "cameraTransformMatrix" && n.invert();
+      } else
+        n = o.clone(), this.options.invertModelView && n.invert(), this.options.applyAxisFix && n.multiply(this._axisFix);
+      r.matrix.copy(n), r.matrix.decompose(r.position, r.quaternion, r.scale);
+    }
   }
-  /**
-   * Disable the plugin (remove event listeners)
-   */
-  disable() {
-    this.core && (this.boundHandleUpdate && this.core.off("engine:update", this.boundHandleUpdate), this.boundHandleMarker && this.core.off("ar:marker", this.boundHandleMarker), this.boundHandleCamera && this.core.off("ar:camera", this.boundHandleCamera), this.boundHandleResize && window.removeEventListener("resize", this.boundHandleResize), this.boundHandleUpdate = null, this.boundHandleMarker = null, this.boundHandleCamera = null, this.boundHandleResize = null, this.renderer && this.renderer.domElement && this.renderer.domElement.parentNode && this.renderer.domElement.parentNode.removeChild(this.renderer.domElement), console.log("[ThreeJSRendererPlugin] Disabled"));
+  handleCamera(e) {
+    const i = e?.projectionMatrix || e?.matrix;
+    Array.isArray(i) && i.length === 16 && (this.camera.projectionMatrix.fromArray(i), this.camera.projectionMatrixInverse.copy(this.camera.projectionMatrix).invert(), console.log("[ThreeJSRendererPlugin] Projection applied"));
   }
-  /**
-   * Dispose and cleanup all resources
-   */
-  dispose() {
-    this.disable(), this.anchors.forEach((e) => {
-      e.parent && e.parent.remove(e);
-    }), this.anchors.clear(), this.renderer && (this.renderer.dispose(), this.renderer = null), this.scene && (this.scene = null), this.camera && (this.camera = null), this.core = null, console.log("[ThreeJSRendererPlugin] Disposed");
-  }
-  /**
-   * Handle engine update event - render the scene
-   */
   handleUpdate() {
     this.renderer && this.scene && this.camera && this.renderer.render(this.scene, this.camera);
   }
-  /**
-   * Handle marker event - create/update marker anchors
-   */
-  handleMarker(e) {
-    const { id: n, matrix: i, visible: a } = e;
-    let r = this.anchors.get(n);
-    r || (r = new t.Group(), r.name = `marker-${n}`, this.scene.add(r), this.anchors.set(n, r)), r.visible = a, i && Array.isArray(i) && (r.matrix.fromArray(i), r.matrix.decompose(r.position, r.quaternion, r.scale));
-  }
-  /**
-   * Handle camera event - update camera projection
-   */
-  handleCamera(e) {
-    e.projectionMatrix && Array.isArray(e.projectionMatrix) && this.setProjectionFromArray(e.projectionMatrix);
-  }
-  /**
-   * Handle window resize
-   */
   handleResize() {
-    if (!this.renderer || !this.camera) return;
-    const e = this.containerElement || document.body, n = e.clientWidth, i = e.clientHeight;
-    this.renderer.setSize(n, i), this.camera.aspect = n / i, this.camera.updateProjectionMatrix();
+    const e = this.options.container || document.body;
+    this._resizeToContainer(e);
   }
-  /**
-   * Set camera projection matrix from array (column-major 4x4)
-   */
-  setProjectionFromArray(e) {
-    if (!this.camera || !Array.isArray(e) || e.length !== 16) {
-      console.warn("[ThreeJSRendererPlugin] Invalid projection matrix");
-      return;
-    }
-    this.camera.projectionMatrix.fromArray(e), this.camera.projectionMatrixInverse.copy(this.camera.projectionMatrix).invert();
+  _resizeToContainer(e) {
+    const i = e.clientWidth || window.innerWidth, a = e.clientHeight || Math.round(i * 3 / 4);
+    this.renderer.setSize(i, a), this.camera.aspect = i / a, this.camera.updateProjectionMatrix();
   }
-  /**
-   * Get Three.js scene for adding custom objects
-   */
+  getAnchor(e) {
+    return this.anchors.get(String(e));
+  }
   getScene() {
     return this.scene;
   }
-  /**
-   * Get Three.js camera
-   */
   getCamera() {
     return this.camera;
   }
-  /**
-   * Get Three.js renderer
-   */
   getRenderer() {
     return this.renderer;
   }
-  /**
-   * Get anchor by marker ID
-   */
-  getAnchor(e) {
-    return this.anchors.get(e);
-  }
 }
 export {
-  d as ThreeJSRendererPlugin
+  c as ThreeJSRendererPlugin
 };
 //# sourceMappingURL=arjs-plugin-threejs.mjs.map
