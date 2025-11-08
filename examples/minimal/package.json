@@ -8,13 +8,7 @@
     "build": "vite build",
     "preview": "vite preview"
   },
-  "dependencies": {
-    "three": "^0.158.0"
-  },
   "devDependencies": {
-    "vite": "^7.1.12",
-    "ar.js-core": "https://github.com/AR-js-org/AR.js-core.git#bc0ec8d699712989de879c37044937cc6d4bd27d",
-    "arjs-plugin-artoolkit": "https://github.com/AR-js-org/arjs-plugin-artoolkit.git#e54ec82db8206705a61eacb9709fa5d34805cc18",
-    "arjs-plugin-threejs": "file:../.."
+    "vite": "^7.1.12"
   }
 }
