@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, '**' ]
+  pull_request:
+    branches: [ main, '**' ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build library
+        run: npm run build:vite
+
+      - name: Run tests
+        run: npm test -- --reporter=dot

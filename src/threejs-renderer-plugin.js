@@ -4,7 +4,6 @@ import * as THREE from 'three';
  * Provides management of renderer, scene, camera and marker anchors.
  * Supported options: antialias, alpha, preferRAF, container, invertModelView, applyAxisFix
  */
-import * as THREE from 'three';
 
 export class ThreeJSRendererPlugin {
     constructor(options = {}) {
@@ -36,6 +35,8 @@ export class ThreeJSRendererPlugin {
             sceneAxesSize: options.sceneAxesSize ?? 2,
             debugAnchorAxes: options.debugAnchorAxes ?? false,
             anchorAxesSize: options.anchorAxesSize ?? 0.5,
+            // NEW: dependency injection for tests
+            rendererFactory: options.rendererFactory || null,
             ...options,
         };
 
@@ -51,13 +52,21 @@ export class ThreeJSRendererPlugin {
         this.engine = engine;
         this.emitter = engine?.eventBus || engine;
 
-        this.renderer = new THREE.WebGLRenderer({
-            antialias: this.options.antialias,
-            alpha: this.options.alpha,
-            preserveDrawingBuffer: false,
-        });
-        this.renderer.setPixelRatio(window.devicePixelRatio);
-        this.renderer.setClearColor(0x000000, 0);
+        // Allow injection of a factory for tests
+        if (typeof this.options.rendererFactory === 'function') {
+            this.renderer = this.options.rendererFactory({
+                antialias: this.options.antialias,
+                alpha: this.options.alpha,
+            });
+        } else {
+            this.renderer = new THREE.WebGLRenderer({
+                antialias: this.options.antialias,
+                alpha: this.options.alpha,
+                preserveDrawingBuffer: false,
+            });
+            this.renderer.setPixelRatio(window.devicePixelRatio);
+            this.renderer.setClearColor(0x000000, 0);
+        }
 
         this.scene = new THREE.Scene();
         this.camera = new THREE.PerspectiveCamera(60, 1, 0.01, 2000);
@@ -144,7 +153,7 @@ export class ThreeJSRendererPlugin {
         this.disable();
         this.anchors.forEach(a => a.parent?.remove(a));
         this.anchors.clear();
-        this.renderer?.dispose();
+        this.renderer?.dispose?.();
         this.renderer = null;
         this.scene = null;
         this.camera = null;
@@ -254,7 +263,7 @@ export class ThreeJSRendererPlugin {
     _resizeToContainer(container) {
         const w = container.clientWidth || window.innerWidth;
         const h = container.clientHeight || Math.round(w * 3 / 4);
-        this.renderer.setSize(w, h);
+        this.renderer.setSize?.(w, h);
         this.camera.aspect = w / h;
         this.camera.updateProjectionMatrix();
     }

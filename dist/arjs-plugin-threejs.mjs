@@ -7,21 +7,28 @@ class c {
       preferRAF: e.preferRAF ?? !0,
       container: e.container || null,
       minConfidence: e.minConfidence ?? 0,
-      // Legacy AR.js transform chain
       useLegacyAxisChain: e.useLegacyAxisChain ?? !0,
       changeMatrixMode: e.changeMatrixMode || "modelViewMatrix",
-      // Experimental (ignored if useLegacyAxisChain = true)
       invertModelView: e.invertModelView ?? !1,
       applyAxisFix: e.applyAxisFix ?? !1,
+      debugSceneAxes: e.debugSceneAxes ?? !1,
+      sceneAxesSize: e.sceneAxesSize ?? 2,
+      debugAnchorAxes: e.debugAnchorAxes ?? !1,
+      anchorAxesSize: e.anchorAxesSize ?? 0.5,
+      // NEW: dependency injection for tests
+      rendererFactory: e.rendererFactory || null,
       ...e
     }, this._rafId = 0, this._axisFix = new t.Matrix4().makeRotationY(Math.PI).multiply(new t.Matrix4().makeRotationZ(Math.PI));
   }
   init(e) {
-    this.engine = e, this.emitter = e?.eventBus || e, this.renderer = new t.WebGLRenderer({
+    this.engine = e, this.emitter = e?.eventBus || e, typeof this.options.rendererFactory == "function" ? this.renderer = this.options.rendererFactory({
+      antialias: this.options.antialias,
+      alpha: this.options.alpha
+    }) : (this.renderer = new t.WebGLRenderer({
       antialias: this.options.antialias,
       alpha: this.options.alpha,
       preserveDrawingBuffer: !1
-    }), this.renderer.setPixelRatio(window.devicePixelRatio), this.renderer.setClearColor(0, 0), this.scene = new t.Scene(), this.camera = new t.PerspectiveCamera(60, 1, 0.01, 2e3), this.scene.add(new t.AmbientLight(16777215, 0.6));
+    }), this.renderer.setPixelRatio(window.devicePixelRatio), this.renderer.setClearColor(0, 0)), this.scene = new t.Scene(), this.camera = new t.PerspectiveCamera(60, 1, 0.01, 2e3), this.scene.add(new t.AmbientLight(16777215, 0.6));
     const i = new t.DirectionalLight(16777215, 0.6);
     i.position.set(1, 1, 1), this.scene.add(i), console.log("[ThreeJSRendererPlugin] Initialized", { hasEventBus: !!e?.eventBus });
   }
@@ -41,13 +48,13 @@ class c {
       };
       this._rafId = requestAnimationFrame(i);
     }
-    this.scene.add(new t.AxesHelper(2)), console.log("[ThreeJSRendererPlugin] Enabled");
+    this.options.debugSceneAxes && this.scene.add(new t.AxesHelper(this.options.sceneAxesSize)), console.log("[ThreeJSRendererPlugin] Enabled");
   }
   disable() {
     this.emitter?.off && (this._off("engine:update", this._onUpdate), this._off("ar:marker", this._onMarker), this._off("ar:getMarker", this._onGetMarker), this._off("ar:camera", this._onCamera), this._off("ar:markerFound", this._onLegacyFound), this._off("ar:markerUpdated", this._onLegacyUpdated), this._off("ar:markerLost", this._onLegacyLost)), window.removeEventListener("resize", this._onResize), this._rafId && cancelAnimationFrame(this._rafId), this._rafId = 0, this.renderer?.domElement?.parentNode && this.renderer.domElement.parentNode.removeChild(this.renderer.domElement), console.log("[ThreeJSRendererPlugin] Disabled");
   }
   dispose() {
-    this.disable(), this.anchors.forEach((e) => e.parent?.remove(e)), this.anchors.clear(), this.renderer?.dispose(), this.renderer = null, this.scene = null, this.camera = null, this.engine = null, this.emitter = null, console.log("[ThreeJSRendererPlugin] Disposed");
+    this.disable(), this.anchors.forEach((e) => e.parent?.remove(e)), this.anchors.clear(), this.renderer?.dispose?.(), this.renderer = null, this.scene = null, this.camera = null, this.engine = null, this.emitter = null, console.log("[ThreeJSRendererPlugin] Disposed");
   }
   _sub(e, i) {
     try {
@@ -82,7 +89,7 @@ class c {
     const { id: i, matrix: a, visible: s } = e || {};
     if (i == null) return;
     let r = this.anchors.get(i);
-    if (r || (r = new t.Group(), r.name = `marker-${i}`, r.matrixAutoUpdate = !1, r.add(new t.AxesHelper(0.5)), this.scene.add(r), this.anchors.set(i, r), console.log("[ThreeJSRendererPlugin] anchor created", i)), typeof s == "boolean" && (r.visible = s), Array.isArray(a) && a.length === 16) {
+    if (r || (r = new t.Group(), r.name = `marker-${i}`, r.matrixAutoUpdate = !1, this.options.debugAnchorAxes && r.add(new t.AxesHelper(this.options.anchorAxesSize)), this.scene.add(r), this.anchors.set(i, r), console.log("[ThreeJSRendererPlugin] anchor created", i)), typeof s == "boolean" && (r.visible = s), Array.isArray(a) && a.length === 16) {
       const o = new t.Matrix4().fromArray(a);
       let n;
       if (this.options.useLegacyAxisChain) {
@@ -106,7 +113,7 @@ class c {
   }
   _resizeToContainer(e) {
     const i = e.clientWidth || window.innerWidth, a = e.clientHeight || Math.round(i * 3 / 4);
-    this.renderer.setSize(i, a), this.camera.aspect = i / a, this.camera.updateProjectionMatrix();
+    this.renderer.setSize?.(i, a), this.camera.aspect = i / a, this.camera.updateProjectionMatrix();
   }
   getAnchor(e) {
     return this.anchors.get(String(e));
