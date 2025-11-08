@@ -1,47 +1,84 @@
-# @AR-js-org/arjs-plugin-threejs
+# arjs-plugin-threejs ✨🧩
 
-Three.js renderer plugin for AR.js-core.
+<p align="center">
+  <a href="https://github.com/AR-js-org/arjs-plugin-threejs/stargazers">
+    <img src="https://img.shields.io/github/stars/AR-js-org/arjs-plugin-threejs?style=flat-square" alt="GitHub Stars">
+  </a>
+  <a href="https://github.com/AR-js-org/arjs-plugin-threejs/network/members">
+    <img src="https://img.shields.io/github/forks/AR-js-org/arjs-plugin-threejs?style=flat-square" alt="GitHub Forks">
+  </a>
+  <a href="https://github.com/AR-js-org/arjs-plugin-threejs/actions/workflows/CI.yml">
+    <img src="https://github.com/AR-js-org/arjs-plugin-threejs/actions/workflows/CI.yml/badge.svg" alt="CI Status">
+  </a>
+  <a href="https://github.com/AR-js-org/arjs-plugin-threejs/blob/main/LICENSE">
+    <img src="https://img.shields.io/github/license/AR-js-org/arjs-plugin-threejs?style=flat-square" alt="License">
+  </a>
+  <a href="https://github.com/AR-js-org/arjs-plugin-threejs/issues">
+    <img src="https://img.shields.io/github/issues/AR-js-org/arjs-plugin-threejs?style=flat-square" alt="Open Issues">
+  </a>
+  <a href="https://img.shields.io/badge/three.js-0.161.0-000000?style=flat-square">
+    <img src="https://img.shields.io/badge/three.js-0.161.0-000000?style=flat-square" alt="Three.js Version">
+  </a>
+</p>
 
-This plugin mounts a Three.js renderer into your app, listens to AR marker/camera events from AR.js-core (e.g., Artoolkit), maintains one Three.js Group “anchor” per marker ID, and renders a scene on each engine tick (or via requestAnimationFrame fallback).
+> 🧪 A Three.js renderer plugin for **AR.js-core**: mounts a WebGL canvas, consumes AR marker + camera events, and exposes per‑marker Three.js `Group` anchors for you to attach content.  
+> 🔧 Defaults replicate classic AR.js axis handling.  
+> 🚀 Designed for extensibility, testability (renderer injection), and modern ESM builds.
 
-- Renderer-agnostic AR.js-core integration
-- Works with unified `ar:marker`, raw worker-level `ar:getMarker`, and legacy `ar:markerFound`/`ar:markerUpdated`/`ar:markerLost` events
-- Applies the classic AR.js axis transform chain by default so Three.js content lands on the marker correctly
+---
 
-See the minimal example in this repo:
-- `examples/minimal/main.js`
+## Table of Contents 📚
+- [Features](#features-)
+- [Install / Build](#install--build-)
+- [Quick Start](#quick-start-engine--artoolkit--threejs-plugin-)
+- [Events](#events-handled-)
+- [Options](#options-)
+- [Camera Projection](#camera-projection-)
+- [Anchors & Adding Content](#anchors-and-how-to-add-content-)
+- [Testing](#testing-)
+- [CI](#ci-)
+- [Compatibility](#compatibility-)
+- [Roadmap Ideas](#roadmap-ideas-)
+- [License](#license-)
 
-## Install / Build
+## Features 🌟
+- ✅ Unified handling for `ar:marker`, raw `ar:getMarker`, legacy `ar:markerFound / Updated / Lost`
+- 🔄 Automatic AR.js classic axis transform chain (`R_y(π) * R_z(π) * modelViewMatrix * R_x(π/2)`)
+- 🧬 Optional experimental path (`invertModelView`, `applyAxisFix`)
+- 🪝 Lazy anchor creation (create Three.js `Group` only when a marker first appears)
+- 🎛 Debug helpers: scene & per‑anchor `AxesHelper`
+- 🧪 Test-friendly: inject your own renderer via `rendererFactory`
+- 🏃 Dual render triggers: `engine:update` or `requestAnimationFrame` fallback
+- 🛡 Confidence filtering on marker events
+- 🧹 Clean disable/dispose lifecycle
 
-Build the library:
+## Install / Build 🛠
 ```bash
 npm run build:vite
 ```
-
 Outputs:
 - ESM: `dist/arjs-plugin-threejs.mjs`
 - CJS: `dist/arjs-plugin-threejs.js`
 - Source maps included
 
-Run the example:
+Serve the example (choose one):
 ```bash
+# If example has its own dev scripts
 cd examples/minimal
 npm i
 npm run dev
+
+# OR from repo root (so relative dist path works)
+npx http-server .
+# Open: http://localhost:8080/examples/minimal/
 ```
 
-In the example, the plugin is imported from `../../dist/arjs-plugin-threejs.mjs`.
-
-## Quick start (Engine + Artoolkit + Three.js plugin)
-
-Minimal wiring based on `examples/minimal/main.js` (paths simplified; adjust imports to your setup):
-
+## Quick start (Engine + Artoolkit + Three.js plugin) 🚀
 ```js
 import { Engine, webcamPlugin, defaultProfilePlugin } from 'ar.js-core';
-// or your local build, e.g. './vendor/ar-js-core/arjs-core.mjs'
 import { ThreeJSRendererPlugin } from '@AR-js-org/arjs-plugin-threejs';
 
-// 1) Create engine and enable core plugins
+// 1) Engine & core plugins
 const engine = new Engine();
 engine.pluginManager.register(defaultProfilePlugin.id, defaultProfilePlugin);
 engine.pluginManager.register(webcamPlugin.id, webcamPlugin);
@@ -49,98 +86,81 @@ const ctx = engine.getContext();
 await engine.pluginManager.enable(defaultProfilePlugin.id, ctx);
 await engine.pluginManager.enable(webcamPlugin.id, ctx);
 
-// 2) Initialize the Artoolkit tracking plugin (import path per your project)
+// 2) Artoolkit plugin
 const { ArtoolkitPlugin } = await import('./vendor/arjs-plugin-artoolkit/arjs-plugin-artoolkit.esm.js');
 const artoolkit = new ArtoolkitPlugin({
-    cameraParametersUrl: '/path/to/camera_para.dat',
-    minConfidence: 0.6,
+  cameraParametersUrl: '/path/to/camera_para.dat',
+  minConfidence: 0.6,
 });
 await artoolkit.init(ctx);
 await artoolkit.enable();
 
-// 3) Emit camera projection once ready (simplified)
+// 3) Projection
 const proj = artoolkit.getProjectionMatrix?.();
 const arr = proj?.toArray ? proj.toArray() : proj;
 if (Array.isArray(arr) && arr.length === 16) {
-    engine.eventBus.emit('ar:camera', { projectionMatrix: arr });
+  engine.eventBus.emit('ar:camera', { projectionMatrix: arr });
 }
 
-// 4) Mount Three.js renderer plugin
+// 4) Three.js plugin
 const threePlugin = new ThreeJSRendererPlugin({
-    container: document.getElementById('viewport'),
-    useLegacyAxisChain: true,
-    changeMatrixMode: 'modelViewMatrix',
-    preferRAF: true,
-    // Debug (optional; defaults off):
-    // debugSceneAxes: true,
-    // sceneAxesSize: 2,
-    // debugAnchorAxes: true,
-    // anchorAxesSize: 0.5,
+  container: document.getElementById('viewport'),
+  useLegacyAxisChain: true,
+  changeMatrixMode: 'modelViewMatrix',
+  preferRAF: true,
+  // debugSceneAxes: true,
+  // debugAnchorAxes: true,
 });
 await threePlugin.init(engine);
 await threePlugin.enable();
 
-// 5) Start the engine loop
+// 5) Start engine loop
 engine.start();
 ```
 
-Notes:
-- Start the webcam and attach the `<video>` element into your viewport with z-index below the Three.js canvas.
-- Anchors (marker Groups) are created lazily when the first pose event arrives; add content when you receive a marker event (see below).
+## Events handled 🔔
+| Event | Payload | Purpose |
+|-------|---------|---------|
+| `ar:marker` | `{ id, matrix?, visible? }` | Unified high-level marker pose/visibility |
+| `ar:getMarker` | `{ matrix, marker: {...} }` | Raw worker-level pose (plugin extracts ID/confidence) |
+| `ar:markerFound / Updated / Lost` | legacy shapes | Adapted internally to `ar:marker` |
+| `ar:camera` | `{ projectionMatrix }` | Sets camera projection |
+| `engine:update` | any | Optional frame trigger (in addition to RAF) |
 
-## Events handled
+## Options ⚙️
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `container` | HTMLElement | `document.body` | Mount target for canvas |
+| `preferRAF` | boolean | `true` | Render each RAF even w/o `engine:update` |
+| `minConfidence` | number | `0` | Ignore `ar:getMarker` below confidence |
+| `useLegacyAxisChain` | boolean | `true` | Use classic AR.js transform chain |
+| `changeMatrixMode` | string | `modelViewMatrix` | Or `cameraTransformMatrix` (inverts) |
+| `invertModelView` | boolean | `false` | Experimental (disabled if legacy chain on) |
+| `applyAxisFix` | boolean | `false` | Experimental axis correction (Y/Z π) |
+| `debugSceneAxes` | boolean | `false` | Show `AxesHelper` at scene origin |
+| `sceneAxesSize` | number | `2` | Size for scene axes helper |
+| `debugAnchorAxes` | boolean | `false` | Add `AxesHelper` per anchor |
+| `anchorAxesSize` | number | `0.5` | Size for anchor axes helper |
+| `rendererFactory` | function | `null` | Inject custom renderer (testing) |
 
-The plugin subscribes to `engine.eventBus` if available, else the engine (must provide `on/off/emit`).
-
-- Unified marker events
-    - `ar:marker` → `{ id, matrix?: number[16], visible?: boolean }`
-- Raw worker-level events
-    - `ar:getMarker` → `{ matrix: number[16], marker: { markerId|id|pattHandle|uid|index, confidence? } }`
-- Legacy marker events
-    - `ar:markerFound`, `ar:markerUpdated`, `ar:markerLost` (adapted internally to `ar:marker`)
-- Camera projection
-    - `ar:camera` → `{ projectionMatrix: number[16] }`
-- Render tick (optional)
-    - `engine:update` (plugin also supports RAF via `preferRAF`)
-
-## Options
-
-Constructor options (selected):
-
-- `container` (HTMLElement): DOM node where the Three.js canvas mounts. Default: `document.body`.
-- `preferRAF` (boolean): Render via RAF even if the engine doesn’t emit `engine:update`. Default: `true`.
-- `minConfidence` (number): If `ar:getMarker` contains `marker.confidence`, ignore events below this threshold. Default: `0`.
-- `useLegacyAxisChain` (boolean): Apply a classic AR.js transform chain. Default: `true`.
-- `changeMatrixMode` ('modelViewMatrix' | 'cameraTransformMatrix'): Matches classic AR.js behavior. Default: `'modelViewMatrix'`.
-- Debug helpers (all default to `false` unless sizes; helpful while integrating):
-    - `debugSceneAxes` (boolean): Show a `THREE.AxesHelper` at scene origin.
-    - `sceneAxesSize` (number): Size of scene axes helper (default `2`).
-    - `debugAnchorAxes` (boolean): Show a `THREE.AxesHelper` on each created anchor.
-    - `anchorAxesSize` (number): Size of anchor axes helper (default `0.5`).
-
-Classic AR.js transform chain (default):
+Classic AR.js chain:
 ```
 finalMatrix = R_y(π) * R_z(π) * modelViewMatrix * R_x(π/2)
 ```
-If `changeMatrixMode === 'cameraTransformMatrix'`, `finalMatrix` is inverted before applying to the anchor.
+If `changeMatrixMode === 'cameraTransformMatrix'`, invert at end.
 
-## Camera projection
-
-For correct perspective, emit a camera projection matrix at least once:
-
+## Camera Projection 🎯
 ```js
-const proj = artoolkit.getProjectionMatrix();         // from your Artoolkit plugin
-const arr = proj?.toArray ? proj.toArray() : proj;    // ensure 16 numbers
+const proj = artoolkit.getProjectionMatrix();
+const arr = proj?.toArray ? proj.toArray() : proj;
 if (Array.isArray(arr) && arr.length === 16) {
   engine.eventBus.emit('ar:camera', { projectionMatrix: arr });
 }
 ```
+Look for log: `Projection applied`.
 
-The plugin will log “Projection applied” when it sets the camera.
-
-## Anchors and how to add content
-
-Anchors (Three.js Groups) are created on-demand when the first pose for a marker ID arrives. Add content in response to marker events:
+## Anchors and how to add content 🧱
+Anchors are created lazily from the first pose event.
 
 ```js
 engine.eventBus.on('ar:getMarker', (d) => {
@@ -153,33 +173,83 @@ engine.eventBus.on('ar:getMarker', (d) => {
     '0'
   );
 
-  // After the first pose, the plugin will have created an anchor
+  // Add content once anchor exists
   setTimeout(() => {
     const anchor = threePlugin.getAnchor(id);
     if (anchor && !anchor.userData._content) {
       anchor.userData._content = true;
       const cube = new THREE.Mesh(
         new THREE.BoxGeometry(0.5, 0.5, 0.5),
-        new THREE.MeshBasicMaterial({ color: 0xff00ff }) // Basic avoids lighting pitfalls
+        new THREE.MeshBasicMaterial({ color: 0xff00ff })
       );
       cube.position.y = 0.25;
       anchor.add(cube);
     }
   }, 0);
 
-  // Forward pose to unified event if your tracker doesn't emit ar:marker:
-  const matrix = d?.matrix;
-  if (Array.isArray(matrix) && matrix.length === 16) {
-    engine.eventBus.emit('ar:marker', { id, matrix, visible: true });
+  // Bridge raw to unified
+  if (Array.isArray(d?.matrix) && d.matrix.length === 16) {
+    engine.eventBus.emit('ar:marker', { id, matrix: d.matrix, visible: true });
   }
 });
 ```
 
-Tips:
-- Use `debugSceneAxes` and/or `debugAnchorAxes` during integration.
-- Keep your viewport container with `position: relative` and a fixed aspect ratio.
-- Style `<video>` at `z-index: 1` and the Three.js `<canvas>` at `z-index: 2`.
+## Testing 🧪
+Run tests:
+```bash
+npm test
+```
+Watch:
+```bash
+npm run test:watch
+```
 
-## License
+Coverage includes:
+- Axis chain vs experimental path
+- Inversion & axis fix effects
+- Confidence filtering
+- Anchor lifecycle (create, reuse, visibility)
+- RAF fallback vs engine:update
+- Projection & inverse
+- Disable/Dispose cleanup
+- Debug helpers presence
+- Matrix invariants (`matrixAutoUpdate=false`)
 
+Test renderer injection example:
+```js
+const fakeRenderer = {
+  domElement: document.createElement('canvas'),
+  setPixelRatio() {},
+  setClearColor() {},
+  setSize() {},
+  render() {},
+  dispose() {}
+};
+const plugin = new ThreeJSRendererPlugin({ rendererFactory: () => fakeRenderer });
+```
+
+## CI 🤖
+GitHub Actions workflow (`.github/workflows/ci.yml`) runs:
+- Install
+- Build
+- Tests (Node version defined in `.nvmrc` file)
+  Badge above shows current status.
+
+## Compatibility 🔄
+- Built & tested with Three.js 0.161.x
+- Requires AR.js-core engine abstraction with an event bus (`on/off/emit`)
+- Should work with any tracking plugin that can emit marker IDs + 4x4 pose matrices
+
+## Roadmap Ideas 🧭
+- 🔌 Additional renderer plugins (Babylon / PlayCanvas)
+- 🧷 Multi-marker composition helpers
+- 🌀 Pose smoothing module (optional add-on)
+- 💡 Example gallery with animated models & GLTF loader integration
+- 🧪 Visual regression tests (screenshot-based) in CI
+
+## License 📄
 MIT © AR.js Org
+
+---
+
+Made with ❤️ for Web AR. Contributions welcome! Open an issue / PR 🛠
