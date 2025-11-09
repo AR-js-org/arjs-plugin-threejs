@@ -1,6 +1,6 @@
 // Import Three.js via ESM CDN (or your bundler)
-import * as THREE from 'https://unpkg.com/three@0.161.0/build/three.module.js';
-
+import * as THREE from 'https://unpkg.com/three@0.181.0/build/three.module.js';
+console.log(THREE.REVISION)
 import {
     Engine,
     CaptureSystem,
