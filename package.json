@@ -5,6 +5,7 @@
   "type": "module",
   "main": "dist/arjs-plugin-threejs.js",
   "module": "dist/arjs-plugin-threejs.mjs",
+  "types": "types/index.d.ts",
   "exports": {
     ".": {
       "import": "./dist/arjs-plugin-threejs.mjs",
