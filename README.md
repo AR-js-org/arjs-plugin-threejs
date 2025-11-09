@@ -235,6 +235,15 @@ GitHub Actions workflow (`.github/workflows/ci.yml`) runs:
 - Tests (Node version defined in `.nvmrc` file)
   Badge above shows current status.
 
+## Type Definitions 🔤🧾
+
+TypeScript declaration files are included in the `types` folder. Prefer importing types from the provided declarations:
+
+- `types/index.d.ts`
+- `types/threejs-renderer-plugin.d.ts`
+
+Source maps (`.d.ts.map`) are included for better editor/IDE support.
+
 ## Compatibility 🔄
 - Built & tested with Three.js 0.161.x
 - Requires AR.js-core engine abstraction with an event bus (`on/off/emit`)

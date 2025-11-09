@@ -14,6 +14,7 @@
   },
   "sideEffects": false,
   "scripts": {
+    "build:types": "tsc",
     "build:vite": "vite build",
     "dev:vite": "vite",
     "serve:vite": "vite preview",
@@ -33,6 +34,7 @@
     "@vitest/coverage-v8": "^4.0.8",
     "three": "^0.161.0",
     "jsdom": "^19.0.0",
+    "typescript": "^3.9.10",
     "vite": "^7.1.12",
     "vitest": "^4.0.8"
   },
