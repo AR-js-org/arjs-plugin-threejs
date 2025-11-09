@@ -1,1 +1,1 @@
-export { ThreeJSRendererPlugin } from './threejs-renderer-plugin.js';
+export { ThreeJSRendererPlugin } from "./threejs-renderer-plugin.js";

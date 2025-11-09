@@ -18,6 +18,8 @@
     "build:types": "tsc",
     "build:vite": "vite build",
     "dev:vite": "vite",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "serve:vite": "vite preview",
     "test": "vitest run --coverage",
     "test:watch": "vitest",
@@ -33,6 +35,7 @@
   "license": "MIT",
   "devDependencies": {
     "@vitest/coverage-v8": "^4.0.8",
+    "prettier": "^3.6.2",
     "three": "^0.181.0",
     "jsdom": "^27.1.0",
     "typescript": "^5.9.3",
