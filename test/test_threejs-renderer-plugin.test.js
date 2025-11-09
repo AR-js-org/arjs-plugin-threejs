@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import * as THREE from 'three';
 import { ThreeJSRendererPlugin } from '../src/threejs-renderer-plugin.js';
+import { THREEJS_RENDERER_PLUGIN_VERSION } from '../src/threejs-renderer-plugin.js';
 
 // Simple event bus mock
 function createEmitter() {
@@ -39,6 +40,10 @@ function makeFakeRenderer() {
         _renderSpy: render,
     };
 }
+
+it('embeds version', () => {
+    expect(THREEJS_RENDERER_PLUGIN_VERSION).not.toBe('unknown');
+});
 
 describe('ThreeJSRendererPlugin', () => {
     let engine;

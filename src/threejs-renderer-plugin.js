@@ -1,4 +1,13 @@
 import * as THREE from 'three';
+
+// Version injected at build time by Vite define.
+// If the define is missing (e.g. in a non-Vite test harness), fallback to 'unknown'.
+const THREEJS_RENDERER_PLUGIN_VERSION =
+    typeof __THREEJS_RENDERER_PLUGIN_VERSION__ !== 'undefined'
+        ? __THREEJS_RENDERER_PLUGIN_VERSION__
+        : 'unknown';
+
+export { THREEJS_RENDERER_PLUGIN_VERSION };
 /**
  * Plugin to render THREE.js scenes driven by AR markers.
  * Provides management of renderer, scene, camera and marker anchors.
@@ -8,6 +17,8 @@ import * as THREE from 'three';
 export class ThreeJSRendererPlugin {
     constructor(options = {}) {
         this.name = 'threejs-renderer';
+        this.version = THREEJS_RENDERER_PLUGIN_VERSION;
+
         this.engine = null;
         this.emitter = null; // engine.eventBus preferred
         this.renderer = null;
@@ -46,6 +57,17 @@ export class ThreeJSRendererPlugin {
         this._axisFix = new THREE.Matrix4()
             .makeRotationY(Math.PI)
             .multiply(new THREE.Matrix4().makeRotationZ(Math.PI));
+
+        console.log(
+            `[ThreeJSRendererPlugin] v${this.version} constructed`,
+            {
+                legacyAxisChain: this.options.useLegacyAxisChain,
+                changeMatrixMode: this.options.changeMatrixMode,
+                preferRAF: this.options.preferRAF,
+                debugSceneAxes: this.options.debugSceneAxes,
+                debugAnchorAxes: this.options.debugAnchorAxes,
+            }
+        );
     }
 
     init(engine) {
@@ -77,7 +99,10 @@ export class ThreeJSRendererPlugin {
         dir.position.set(1, 1, 1);
         this.scene.add(dir);
 
-        console.log('[ThreeJSRendererPlugin] Initialized', { hasEventBus: !!engine?.eventBus });
+        console.log('[ThreeJSRendererPlugin] Initialized', {
+            hasEventBus: !!engine?.eventBus,
+            version: this.version,
+        });
     }
 
     enable() {
@@ -127,7 +152,7 @@ export class ThreeJSRendererPlugin {
             this.scene.add(new THREE.AxesHelper(this.options.sceneAxesSize));
         }
 
-        console.log('[ThreeJSRendererPlugin] Enabled');
+        console.log('[ThreeJSRendererPlugin] Enabled v' + this.version);
     }
 
     disable() {
@@ -146,7 +171,7 @@ export class ThreeJSRendererPlugin {
         if (this.renderer?.domElement?.parentNode) {
             this.renderer.domElement.parentNode.removeChild(this.renderer.domElement);
         }
-        console.log('[ThreeJSRendererPlugin] Disabled');
+        console.log('[ThreeJSRendererPlugin] Disabled v' + this.version);
     }
 
     dispose() {
@@ -159,7 +184,7 @@ export class ThreeJSRendererPlugin {
         this.camera = null;
         this.engine = null;
         this.emitter = null;
-        console.log('[ThreeJSRendererPlugin] Disposed');
+        console.log('[ThreeJSRendererPlugin] Disposed v' + this.version);
     }
 
     _sub(ev, fn) { try { this.emitter?.on?.(ev, fn); } catch {} }
@@ -245,7 +270,7 @@ export class ThreeJSRendererPlugin {
         if (Array.isArray(arr) && arr.length === 16) {
             this.camera.projectionMatrix.fromArray(arr);
             this.camera.projectionMatrixInverse.copy(this.camera.projectionMatrix).invert();
-            console.log('[ThreeJSRendererPlugin] Projection applied');
+            console.log('[ThreeJSRendererPlugin] Projection applied v' + this.version);
         }
     }
 

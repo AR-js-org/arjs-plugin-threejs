@@ -1,30 +1,27 @@
 import { defineConfig } from 'vite';
-import { resolve } from 'path';
-import { fileURLToPath } from 'url';
-
-const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
 export default defineConfig({
-  build: {
-    lib: {
-      entry: resolve(__dirname, 'src/index.js'),
-      name: 'ARJSPluginThreeJS',
-      formats: ['es', 'cjs'],
-      fileName: (format) => {
-        if (format === 'es') return 'arjs-plugin-threejs.mjs';
-        if (format === 'cjs') return 'arjs-plugin-threejs.js';
-        return `arjs-plugin-threejs.${format}.js`;
-      }
+    build: {
+        lib: {
+            entry: 'src/index.js',
+            name: 'ARJSPluginThreeJS',
+            formats: ['es', 'cjs'],
+            fileName: (format) =>
+                format === 'es' ? 'arjs-plugin-threejs.mjs' : 'arjs-plugin-threejs.js',
+        },
+        sourcemap: true,
+        rollupOptions: {
+            external: ['three', 'ar.js-core'],
+            output: {
+                globals: {
+                    three: 'THREE',
+                },
+            },
+        },
     },
-    rollupOptions: {
-      external: ['three', 'ar.js-core'],
-      output: {
-        globals: {
-          'three': 'THREE',
-          'ar.js-core': 'ARJS'
-        }
-      }
+    // Inject the package version as a global constant for the plugin to log.
+    // Vite automatically populates process.env.npm_package_version.
+    define: {
+        __THREEJS_RENDERER_PLUGIN_VERSION__: JSON.stringify(process.env.npm_package_version),
     },
-    sourcemap: true
-  }
 });
