@@ -1,5 +1,5 @@
 {
-  "name": "@AR-js-org/arjs-plugin-threejs",
+  "name": "@ar-js-org/arjs-plugin-threejs",
   "version": "0.1.0",
   "description": "Three.js renderer plugin for AR.js-core",
   "type": "module",

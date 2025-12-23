@@ -1,5 +1,5 @@
 // Import Three.js via ESM CDN (or your bundler)
-import * as THREE from "https://unpkg.com/three@0.181.0/build/three.module.js";
+import * as THREE from "https://unpkg.com/three@0.182.0/build/three.module.js";
 console.log(THREE.REVISION);
 import {
   Engine,
@@ -91,7 +91,7 @@ async function bootstrap() {
 
   // Import plugins
   const artoolkitMod =
-    await import("./vendor/arjs-plugin-artoolkit/arjs-plugin-artoolkit.esm.js");
+    await import("./vendor/arjs-plugin-artoolkit/arjs-plugin-artoolkit.es.js");
   const ArtoolkitPlugin = artoolkitMod.ArtoolkitPlugin || artoolkitMod.default;
 
   // Import the ThreeJS renderer plugin from the external repo build
