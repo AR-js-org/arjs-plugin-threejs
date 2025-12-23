@@ -90,9 +90,8 @@ async function bootstrap() {
   engine.pluginManager.register(webcamPlugin.id, webcamPlugin);
 
   // Import plugins
-  const artoolkitMod = await import(
-    "./vendor/arjs-plugin-artoolkit/arjs-plugin-artoolkit.esm.js"
-  );
+  const artoolkitMod =
+    await import("./vendor/arjs-plugin-artoolkit/arjs-plugin-artoolkit.esm.js");
   const ArtoolkitPlugin = artoolkitMod.ArtoolkitPlugin || artoolkitMod.default;
 
   // Import the ThreeJS renderer plugin from the external repo build

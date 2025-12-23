@@ -94,9 +94,8 @@ await engine.pluginManager.enable(defaultProfilePlugin.id, ctx);
 await engine.pluginManager.enable(webcamPlugin.id, ctx);
 
 // 2) Artoolkit plugin
-const { ArtoolkitPlugin } = await import(
-  "./vendor/arjs-plugin-artoolkit/arjs-plugin-artoolkit.esm.js"
-);
+const { ArtoolkitPlugin } =
+  await import("./vendor/arjs-plugin-artoolkit/arjs-plugin-artoolkit.esm.js");
 const artoolkit = new ArtoolkitPlugin({
   cameraParametersUrl: "/path/to/camera_para.dat",
   minConfidence: 0.6,
