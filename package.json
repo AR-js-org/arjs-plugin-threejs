@@ -15,6 +15,7 @@
   },
   "sideEffects": false,
   "scripts": {
+    "build": "npm run build:vite && npm run build:types",
     "build:types": "tsc",
     "build:vite": "vite build",
     "dev:vite": "vite",
@@ -22,7 +23,7 @@
     "format:check": "prettier --check .",
     "lint": "eslint . --ext .js",
     "prepare": "husky",
-    "prepublishOnly": "npm run build:vite && npm run build:types",
+    "prepublishOnly": "npm run build",
     "serve:vite": "vite preview",
     "test": "vitest run --coverage",
     "test:watch": "vitest"
@@ -31,9 +32,10 @@
     "ar.js",
     "threejs",
     "augmented-reality",
+    "webar",
     "webxr"
   ],
-  "author": "AR.js Org",
+  "author": "Walter Perdan @kalwalt https://github.com/kalwalt",
   "license": "MIT",
   "devDependencies": {
     "@vitest/coverage-v8": "^4.0.16",
