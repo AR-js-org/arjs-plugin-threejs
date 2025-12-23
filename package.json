@@ -20,10 +20,12 @@
     "dev:vite": "vite",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "lint": "eslint . --ext .js",
+    "prepare": "husky",
+    "prepublishOnly": "npm run build:vite && npm run build:types",
     "serve:vite": "vite preview",
     "test": "vitest run --coverage",
-    "test:watch": "vitest",
-    "lint": "echo \"no lint configured\""
+    "test:watch": "vitest"
   },
   "keywords": [
     "ar.js",
@@ -34,13 +36,15 @@
   "author": "AR.js Org",
   "license": "MIT",
   "devDependencies": {
-    "@vitest/coverage-v8": "^4.0.8",
-    "prettier": "^3.6.2",
-    "three": "^0.181.0",
-    "jsdom": "^27.1.0",
+    "@vitest/coverage-v8": "^4.0.16",
+    "eslint": "^9.39.2",
+    "husky": "^9.1.7",
+    "jsdom": "^27.3.0",
+    "prettier": "^3.7.4",
+    "three": "^0.182.0",
     "typescript": "^5.9.3",
-    "vite": "^7.2.2",
-    "vitest": "^4.0.8"
+    "vite": "^7.3.0",
+    "vitest": "^4.0.16"
   },
   "repository": {
     "type": "git",
