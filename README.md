@@ -56,6 +56,8 @@
 
 ## Install / Build 🛠
 
+> Note: the `dist` and `types` folders are not committed. If you modify the source, run `npm install`, then rebuild with `npm run build:vite` and `npm run build:types` before using the package or publishing.
+
 ```bash
 npm run build:vite
 ```
