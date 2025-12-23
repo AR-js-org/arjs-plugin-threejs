@@ -1,6 +1,6 @@
 # arjs-plugin-threejs ✨🧩
 
-<p align="center">
+<p style="text-align: center;">
   <a href="https://github.com/AR-js-org/arjs-plugin-threejs/stargazers">
     <img src="https://img.shields.io/github/stars/AR-js-org/arjs-plugin-threejs?style=flat-square" alt="GitHub Stars">
   </a>
@@ -128,30 +128,30 @@ engine.start();
 
 ## Events handled 🔔
 
-| Event                             | Payload                     | Purpose                                               |
-| --------------------------------- | --------------------------- | ----------------------------------------------------- |
-| `ar:marker`                       | `{ id, matrix?, visible? }` | Unified high-level marker pose/visibility             |
-| `ar:getMarker`                    | `{ matrix, marker: {...} }` | Raw worker-level pose (plugin extracts ID/confidence) |
-| `ar:markerFound / Updated / Lost` | legacy shapes               | Adapted internally to `ar:marker`                     |
-| `ar:camera`                       | `{ projectionMatrix }`      | Sets camera projection                                |
-| `engine:update`                   | any                         | Optional frame trigger (in addition to RAF)           |
+| Event                                               | Payload                     | Purpose                                               |
+|-----------------------------------------------------|-----------------------------|-------------------------------------------------------|
+| `ar:marker`                                         | `{ id, matrix?, visible? }` | Unified high-level marker pose/visibility             |
+| `ar:getMarker`                                      | `{ matrix, marker: {...} }` | Raw worker-level pose (plugin extracts ID/confidence) |
+| `ar:markerFound / ar:markerUpdated / ar:markerLost` | legacy shapes               | Adapted internally to `ar:marker`                     |
+| `ar:camera`                                         | `{ projectionMatrix }`      | Sets camera projection                                |
+| `engine:update`                                     | `any`                       | Optional frame trigger (in addition to RAF)           |
 
 ## Options ⚙️
 
-| Option               | Type        | Default           | Description                                |
-| -------------------- | ----------- | ----------------- | ------------------------------------------ |
-| `container`          | HTMLElement | `document.body`   | Mount target for canvas                    |
-| `preferRAF`          | boolean     | `true`            | Render each RAF even w/o `engine:update`   |
-| `minConfidence`      | number      | `0`               | Ignore `ar:getMarker` below confidence     |
-| `useLegacyAxisChain` | boolean     | `true`            | Use classic AR.js transform chain          |
-| `changeMatrixMode`   | string      | `modelViewMatrix` | Or `cameraTransformMatrix` (inverts)       |
-| `invertModelView`    | boolean     | `false`           | Experimental (disabled if legacy chain on) |
-| `applyAxisFix`       | boolean     | `false`           | Experimental axis correction (Y/Z π)       |
-| `debugSceneAxes`     | boolean     | `false`           | Show `AxesHelper` at scene origin          |
-| `sceneAxesSize`      | number      | `2`               | Size for scene axes helper                 |
-| `debugAnchorAxes`    | boolean     | `false`           | Add `AxesHelper` per anchor                |
-| `anchorAxesSize`     | number      | `0.5`             | Size for anchor axes helper                |
-| `rendererFactory`    | function    | `null`            | Inject custom renderer (testing)           |
+| Option               | Type                 | Default           | Description                                |
+|----------------------|----------------------|-------------------|--------------------------------------------|
+| `container`          | `HTMLElement`        | `document.body`   | Mount target for canvas                    |
+| `preferRAF`          | `boolean`            | `true`            | Render each RAF even w/o `engine:update`   |
+| `minConfidence`      | `number`             | `0`               | Ignore `ar:getMarker` below confidence     |
+| `useLegacyAxisChain` | `boolean`            | `true`            | Use classic AR.js transform chain          |
+| `changeMatrixMode`   | `string`             | `modelViewMatrix` | Or `cameraTransformMatrix` (inverts)       |
+| `invertModelView`    | `boolean`            | `false`           | Experimental (disabled if legacy chain on) |
+| `applyAxisFix`       | `boolean`            | `false`           | Experimental axis correction (Y/Z π)       |
+| `debugSceneAxes`     | `boolean`            | `false`           | Show `AxesHelper` at scene origin          |
+| `sceneAxesSize`      | `number`             | `2`               | Size for scene axes helper                 |
+| `debugAnchorAxes`    | `boolean`            | `false`           | Add `AxesHelper` per anchor                |
+| `anchorAxesSize`     | `number`             | `0.5`             | Size for anchor axes helper                |
+| `rendererFactory`    | `Function` \| `null` | `null`            | Inject custom renderer (testing)           |
 
 Classic AR.js chain:
 
@@ -159,7 +159,7 @@ Classic AR.js chain:
 finalMatrix = R_y(π) * R_z(π) * modelViewMatrix * R_x(π/2)
 ```
 
-If `changeMatrixMode === 'cameraTransformMatrix'`, invert at end.
+If `changeMatrixMode === 'cameraTransformMatrix'`, invert at the end.
 
 ## Camera Projection 🎯
 
@@ -225,7 +225,7 @@ npm run test:watch
 
 Coverage includes:
 
-- Axis chain vs experimental path
+- Axis chain vs. experimental path
 - Inversion & axis fix effects
 - Confidence filtering
 - Anchor lifecycle (create, reuse, visibility)
