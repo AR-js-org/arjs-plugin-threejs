@@ -129,7 +129,7 @@ engine.start();
 ## Events handled 🔔
 
 | Event                                               | Payload                     | Purpose                                               |
-|-----------------------------------------------------|-----------------------------|-------------------------------------------------------|
+| --------------------------------------------------- | --------------------------- | ----------------------------------------------------- |
 | `ar:marker`                                         | `{ id, matrix?, visible? }` | Unified high-level marker pose/visibility             |
 | `ar:getMarker`                                      | `{ matrix, marker: {...} }` | Raw worker-level pose (plugin extracts ID/confidence) |
 | `ar:markerFound / ar:markerUpdated / ar:markerLost` | legacy shapes               | Adapted internally to `ar:marker`                     |
@@ -139,7 +139,7 @@ engine.start();
 ## Options ⚙️
 
 | Option               | Type                 | Default           | Description                                |
-|----------------------|----------------------|-------------------|--------------------------------------------|
+| -------------------- | -------------------- | ----------------- | ------------------------------------------ |
 | `container`          | `HTMLElement`        | `document.body`   | Mount target for canvas                    |
 | `preferRAF`          | `boolean`            | `true`            | Render each RAF even w/o `engine:update`   |
 | `minConfidence`      | `number`             | `0`               | Ignore `ar:getMarker` below confidence     |
