@@ -63,6 +63,10 @@ function attachVideoToViewport() {
   const videoEl = videoElement();
   if (!videoEl) return;
   videoEl.remove();
+  // The webcam plugin styles the video inline for a page-wide background,
+  // including z-index -2: that would beat index.html's `.viewport video`
+  // rule and put the video behind the viewport's black background.
+  videoEl.removeAttribute("style");
   videoEl.setAttribute("playsinline", "");
   videoEl.setAttribute("autoplay", "");
   videoEl.muted = true;
