@@ -3,7 +3,9 @@
   "include": ["src/**/*"],
   "compilerOptions": {
     "target": "ESnext" /* Specify ECMAScript target version: 'ES3' (default), 'ES5', 'ES2015', 'ES2016', 'ES2017', 'ES2018', 'ES2019', 'ES2020', or 'ESNEXT'. */,
-    "module": "ESnext",
+    // TypeScript 6 deprecates moduleResolution "node" (node10). The package is
+    // "type": "module" and src/ imports with extensions, so nodenext fits.
+    "module": "nodenext",
     // Tells TypeScript to read JS files, as
     // normally they are ignored as source files
     "allowJs": true,
@@ -13,11 +15,18 @@
     // only output d.ts files
     "emitDeclarationOnly": true,
     /* Module Resolution Options */
-    "moduleResolution": "node",
+    "moduleResolution": "nodenext",
     // Types should go into this directory.
     // Removing this would place the .d.ts files
     // next to the .js files
     "outDir": "types",
+    // TypeScript 6 requires rootDir when an output directory is set. src is
+    // the common source directory TypeScript 5 inferred, so types/ keeps its
+    // layout.
+    "rootDir": "src",
+    // TypeScript 6 turns strict on by default, which types JSDoc {Object} as
+    // Object instead of any and narrows the published declarations.
+    "strict": false,
     // go to js file when using IDE functions like
     // "Go to Definition" in VSCode
     "declarationMap": true
