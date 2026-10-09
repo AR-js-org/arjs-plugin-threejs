@@ -32,6 +32,12 @@ jobs:
           npm run build:types
           npm run test:types
 
+      # The example links the library's dist/ (file:../..), built above.
+      - name: Build minimal example
+        run: |
+          npm ci --prefix examples/minimal
+          npm run build --prefix examples/minimal
+
       - name: Check formatting
         run: npm run format:check
 

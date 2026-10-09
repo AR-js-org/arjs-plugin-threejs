@@ -99,16 +99,16 @@
     <div class="container">
       <h1>AR.js Core + Artoolkit + Three.js Renderer Plugin</h1>
       <p>
-        Use the buttons to start/stop the webcam and load the HIRO pattern
-        marker.
+        Start the webcam, then load the markers: a cube appears on the Hiro
+        pattern and a sphere on the 3x3 barcode 0.
       </p>
 
       <div id="status" class="status">Initializing…</div>
 
       <div class="controls">
-        <button id="startBtn">Start Webcam</button>
+        <button id="startBtn" disabled>Start Webcam</button>
         <button id="stopBtn" disabled>Stop</button>
-        <button id="loadBtn" disabled>Load Marker</button>
+        <button id="loadBtn" disabled>Load markers</button>
       </div>
 
       <div id="viewport" class="viewport"></div>

@@ -1,18 +1,22 @@
-// Import Three.js via ESM CDN (or your bundler)
-import * as THREE from "https://unpkg.com/three@0.182.0/build/three.module.js";
-console.log(THREE.REVISION);
+// Example: AR.js-next ECS + ArtoolkitPlugin + ThreeJSRendererPlugin.
+// A cube sits on the Hiro pattern and a sphere on the 3x3 barcode 0.
+// The renderer is linked from this repository (file:../..); the core and the
+// tracker come from npm.
+
+import * as THREE from "three";
 import {
   Engine,
   CaptureSystem,
   FramePumpSystem,
   SOURCE_TYPES,
+  EVENTS,
   webcamPlugin,
   defaultProfilePlugin,
-} from "./vendor/ar-js-core/arjs-core.mjs";
+} from "@ar-js-org/ar.js-next";
+import { ArtoolkitPlugin } from "@ar-js-org/arjs-plugin-artoolkit";
+import { ThreeJSRendererPlugin } from "@ar-js-org/arjs-plugin-threejs";
+import wasmUrl from "@ar-js-org/artoolkit5-wasm/dist/artoolkit5.wasm?url";
 
-// Example: AR.js Core ECS + ArtoolkitPlugin + ThreeJSRendererPlugin
-
-// UI
 const statusEl = document.getElementById("status");
 const logEl = document.getElementById("log");
 const startBtn = document.getElementById("startBtn");
@@ -21,9 +25,8 @@ const loadBtn = document.getElementById("loadBtn");
 const viewport = document.getElementById("viewport");
 
 function log(message) {
-  const ts = new Date().toISOString();
   const el = document.createElement("div");
-  el.textContent = `[${ts}] ${message}`;
+  el.textContent = `[${new Date().toISOString()}] ${message}`;
   logEl.appendChild(el);
   logEl.scrollTop = logEl.scrollHeight;
   console.log(message);
@@ -36,330 +39,211 @@ function setStatus(msg, type = "normal") {
   if (type === "error") statusEl.classList.add("error");
 }
 
-// Attach webcam <video> into the viewport without removing other children (like the Three.js canvas)
-function attachVideoToViewport(ctx) {
-  const frameSource = CaptureSystem.getFrameSource(ctx);
-  const videoEl = frameSource?.element;
-  if (!videoEl || !viewport) return;
-
-  try {
-    if (videoEl.parentNode && videoEl.parentNode !== viewport) {
-      videoEl.parentNode.removeChild(videoEl);
-    }
-  } catch {}
-
-  try {
-    videoEl.setAttribute("playsinline", "");
-    videoEl.setAttribute("autoplay", "");
-    videoEl.muted = true;
-    videoEl.controls = false;
-  } catch {}
-
-  Object.assign(videoEl.style, {
-    position: "relative",
-    top: "0px",
-    left: "0px",
-    zIndex: "1", // video under the ThreeJS renderer
-    width: "100%",
-    height: "auto",
-    display: "block",
-  });
-
-  // Do NOT clear viewport; preserve plugin canvas
-  if (!viewport.contains(videoEl)) {
-    viewport.appendChild(videoEl);
-  }
-}
-
-// Engine/plugin state
 let engine;
 let ctx;
 let artoolkit;
 let threePlugin;
-let pumping = false;
 let cameraStarted = false;
+let workerReady = false;
+let framesFlowing = false;
+let markersLoaded = false;
 
-const cameraParamsUrl = new URL("./data/camera_para.dat", import.meta.url).href;
-const hiroUrl = new URL("./data/patt.hiro", import.meta.url).href;
+// "Load markers" needs the worker and at least one frame: the tracker creates
+// its detector from the first frame's dimensions.
+function updateLoadButton() {
+  loadBtn.disabled = !(workerReady && framesFlowing) || markersLoaded;
+}
+
+function videoElement() {
+  return CaptureSystem.getFrameSource(ctx)?.element;
+}
+
+// The video goes under the renderer's canvas, which the plugin mounted first.
+function attachVideoToViewport() {
+  const videoEl = videoElement();
+  if (!videoEl) return;
+  videoEl.remove();
+  videoEl.setAttribute("playsinline", "");
+  videoEl.setAttribute("autoplay", "");
+  videoEl.muted = true;
+  videoEl.controls = false;
+  viewport.prepend(videoEl);
+}
+
+/** What to put on each marker, by family. Units are marker widths. */
+function contentFor(type) {
+  if (type === "barcode") {
+    const sphere = new THREE.Mesh(
+      new THREE.SphereGeometry(0.3, 32, 16),
+      new THREE.MeshNormalMaterial(),
+    );
+    sphere.position.z = 0.3;
+    return sphere;
+  }
+  const cube = new THREE.Mesh(
+    new THREE.BoxGeometry(0.5, 0.5, 0.5),
+    new THREE.MeshNormalMaterial(),
+  );
+  // The marker lies in the anchor's XY plane; +Z points out of it.
+  cube.position.z = 0.25;
+  return cube;
+}
+
+// Anchors are created on a marker's first ar:markerFound; content is added
+// once per anchor and stays, shown and hidden with it.
+function addContent({ markerId, type }) {
+  const anchor = threePlugin.getAnchor(markerId, type);
+  if (!anchor || anchor.userData.hasContent) return;
+  anchor.add(contentFor(type));
+  anchor.userData.hasContent = true;
+}
 
 async function bootstrap() {
   engine = new Engine();
+  ctx = engine.getContext();
 
-  // Register core/source plugins
   engine.pluginManager.register(defaultProfilePlugin.id, defaultProfilePlugin);
   engine.pluginManager.register(webcamPlugin.id, webcamPlugin);
 
-  // Import plugins
-  const artoolkitMod =
-    await import("./vendor/arjs-plugin-artoolkit/arjs-plugin-artoolkit.es.js");
-  const ArtoolkitPlugin = artoolkitMod.ArtoolkitPlugin || artoolkitMod.default;
-
-  // Import the ThreeJS renderer plugin from the external repo build
-  // Make sure the ESM file from PR #2 is available at this path, or adjust accordingly.
-  const threeMod = await import("../../dist/arjs-plugin-threejs.mjs");
-  const ThreeJSRendererPlugin =
-    threeMod.ThreeJSRendererPlugin || threeMod.default;
-
-  const enableLoadBtn = () => {
-    loadBtn.disabled = false;
-    setStatus(
-      "Worker ready. You can start the webcam and load the marker.",
-      "success",
-    );
-  };
-
-  // Event bus
-  const bus = engine.eventBus;
-
-  // DEBUG: log all eventBus emits
-  if (bus && typeof bus.emit === "function") {
-    const _emit = bus.emit.bind(bus);
-    bus.emit = (name, payload) => {
-      //console.debug('[eventBus.emit]', name, payload);
-      return _emit(name, payload);
-    };
-  }
-
-  // Event listeners before enabling
-  bus.on("ar:workerReady", () => {
+  // Listeners first, so an early ready is not missed.
+  engine.eventBus.on(EVENTS.WORKER_READY, () => {
+    workerReady = true;
     log("Worker ready");
     setStatus(
-      "Worker ready. You can start the webcam and load the marker.",
+      "Worker ready. Start the webcam, then load the markers.",
       "success",
     );
-    //loadBtn.disabled = false;
-    enableLoadBtn();
-    try {
-      const proj = artoolkit?.getProjectionMatrix?.();
-      const arr = proj?.toArray ? proj.toArray() : proj;
-      if (Array.isArray(arr) && arr.length === 16) {
-        bus.emit("ar:camera", { projectionMatrix: arr });
-      }
-    } catch {}
+    updateLoadButton();
   });
-  //engine.eventBus.on('ar:ready', enableLoadBtn);
-  //engine.eventBus.on('ar:initialized', enableLoadBtn);
-  bus.on("ar:workerError", (e) => {
-    log(`workerError: ${JSON.stringify(e)}`);
-    setStatus("Worker error (see console)", "error");
+  engine.eventBus.on(EVENTS.WORKER_ERROR, (e) => {
+    log(`workerError: ${e?.message}`);
+    setStatus("Worker error (see the log)", "error");
   });
-
-  bus.on("ar:getMarker", (d) => {
-    //const id = String(extractMarkerId(d));
-    const id = String(
-      d?.marker?.markerId ??
-        d?.marker?.id ??
-        d?.marker?.pattHandle ??
-        d?.marker?.uid ??
-        d?.marker?.index ??
-        "0",
-    );
-    setTimeout(() => {
-      const anchor = threePlugin.getAnchor(id);
-      if (anchor && !anchor.userData._content) {
-        anchor.userData._content = true;
-        const cube = new THREE.Mesh(
-          new THREE.BoxGeometry(0.5, 0.5, 0.5),
-          new THREE.MeshBasicMaterial({ color: 0xff00ff }),
-        );
-        cube.position.y = 0.25;
-        anchor.add(cube);
-        console.log("[example] Added cube to anchor", id);
-      }
-    }, 0);
-
-    const matrix = d?.matrix;
-    if (Array.isArray(matrix) && matrix.length === 16) {
-      bus.emit("ar:marker", {
-        id,
-        matrix,
-        visible: true,
-        source: "bridge:getMarker",
-      });
+  engine.eventBus.on(EVENTS.ENGINE_UPDATE, (frame) => {
+    // A frame produced while the webcam was stopping must not mark frames as
+    // flowing again: "Load markers" would enable with no camera.
+    if (!cameraStarted || !frame?.imageBitmap) return;
+    if (!framesFlowing) {
+      framesFlowing = true;
+      updateLoadButton();
     }
   });
-  // Marker events for logging only (the Three plugin manages anchors and visibility)
-  // Bridge legacy marker events => unified ar:marker for ThreeJSRendererPlugin
-  bus.on("ar:markerFound", (d) => {
-    bus.emit("ar:marker", {
-      id: d?.markerId ?? d?.id,
-      matrix: d?.matrix ?? d?.transformationMatrix,
-      visible: true,
-    });
-  });
-  bus.on("ar:markerUpdated", (d) => {
-    bus.emit("ar:marker", {
-      id: d?.markerId ?? d?.id,
-      matrix: d?.matrix ?? d?.transformationMatrix,
-      visible: true,
-    });
-  });
-  bus.on("ar:markerLost", (d) => {
-    bus.emit("ar:marker", { id: d?.markerId ?? d?.id, visible: false });
-  });
 
-  // Enable core plugins
-  ctx = engine.getContext();
   await engine.pluginManager.enable(defaultProfilePlugin.id, ctx);
   await engine.pluginManager.enable(webcamPlugin.id, ctx);
 
-  // Tracking plugin
-  artoolkit = new ArtoolkitPlugin({
-    cameraParametersUrl: cameraParamsUrl,
-    minConfidence: 0.6,
-  });
-
-  try {
-    await artoolkit.init(ctx);
-    await artoolkit.enable();
-  } catch (e) {
-    console.error("[ArtoolkitPlugin] init/enable failed:", e);
-    setStatus("ARToolKit plugin failed to initialize (see console)", "error");
-    return;
-  }
-
-  // Three.js renderer plugin
+  // The renderer is enabled before the tracker, so it is already listening
+  // when the first frame makes the tracker emit ar:camera with the projection.
   threePlugin = new ThreeJSRendererPlugin({
-    container: viewport, // mount renderer here
-    alpha: true, // transparent canvas over video
+    container: viewport,
+    alpha: true,
     antialias: true,
-    preserveDrawingBuffer: false,
-    useLegacyAxisChain: true,
-    changeMatrixMode: "modelViewMatrix", // or 'cameraTransformMatrix'
     preferRAF: true,
   });
   await threePlugin.init(engine);
   await threePlugin.enable();
 
-  const r = threePlugin.getRenderer();
-  if (r) {
-    // Force canvas to fill the viewport
-    r.domElement.style.position = "absolute";
-    r.domElement.style.inset = "0";
-    r.domElement.style.width = "100%";
-    r.domElement.style.height = "100%";
-    // use this line below for testing
-    // r.domElement.style.background = 'rgba(255,0,0,0.5)';
+  // After the renderer subscribed, so the anchor exists when this runs.
+  engine.eventBus.on(EVENTS.MARKER_FOUND, (e) => {
+    log(`found ${e.type}:${e.markerId} confidence ${e.confidence.toFixed(2)}`);
+    addContent(e);
+  });
+  engine.eventBus.on(EVENTS.MARKER_LOST, (e) => {
+    log(`lost ${e.type}:${e.markerId}`);
+  });
+
+  artoolkit = new ArtoolkitPlugin({
+    wasmUrl,
+    cameraParametersUrl: "/data/camera_para.dat",
+    // Patterns and barcodes in the same frame.
+    detectionMode: "color_and_matrix",
+    matrixCodeType: "3x3",
+  });
+  // register/enable return booleans and never throw.
+  if (!engine.pluginManager.register("artoolkit", artoolkit)) {
+    throw new Error("Could not register the ARToolKit plugin");
   }
+  if (!(await engine.pluginManager.enable("artoolkit", ctx))) {
+    throw new Error("Could not initialise the ARToolKit plugin");
+  }
+  // The plugin's own enable() starts its worker; the manager does not call it.
+  await artoolkit.enable();
 
-  const cam = threePlugin.getCamera();
-  cam.near = 0.01;
-  cam.far = 5000;
-  cam.updateProjectionMatrix();
-
-  // Start ECS loop (systems/plugins tick)
   engine.start();
-
-  // Fallback: if worker was already ready
-  if (artoolkit.workerReady) {
-    log("Worker was already ready (post-enable).");
-    setStatus(
-      "Worker ready. You can start the webcam and load the marker.",
-      "success",
-    );
-    loadBtn.disabled = false;
-  } else {
-    setStatus("Plugin initialized. Waiting for worker…", "normal");
-  }
-
-  // UI initial state
+  if (!workerReady) setStatus("Plugins initialised. Waiting for the worker…");
   startBtn.disabled = false;
-  stopBtn.disabled = true;
 }
 
 async function startWebcam() {
   if (cameraStarted) return;
+  startBtn.disabled = true;
+  setStatus("Starting the webcam…");
   try {
-    startBtn.disabled = true;
-    stopBtn.disabled = true;
-    setStatus("Starting webcam…", "normal");
-    log("Initializing webcam capture");
-
     await CaptureSystem.initialize(
-      {
-        sourceType: SOURCE_TYPES.WEBCAM,
-        sourceWidth: 640,
-        sourceHeight: 480,
-      },
+      { sourceType: SOURCE_TYPES.WEBCAM, sourceWidth: 640, sourceHeight: 480 },
       ctx,
     );
-
-    attachVideoToViewport(ctx);
-
-    if (!pumping) {
-      FramePumpSystem.start(ctx);
-      pumping = true;
-    }
-
+    attachVideoToViewport();
+    FramePumpSystem.start(ctx);
     cameraStarted = true;
-    setStatus("Webcam started. You can now show the marker.", "success");
-    log("Webcam started.");
     stopBtn.disabled = false;
+    setStatus(
+      "Webcam started. Load the markers, then show them to the camera.",
+      "success",
+    );
+    log("Webcam started");
   } catch (err) {
-    log("Camera error: " + (err?.message || err));
-    setStatus("Camera error (see console)", "error");
+    log(`Camera error: ${err?.message || err}`);
+    setStatus("Camera error (see the log)", "error");
     startBtn.disabled = false;
-    stopBtn.disabled = true;
   }
 }
 
 async function stopWebcam() {
   if (!cameraStarted) return;
-  try {
-    setStatus("Stopping webcam…", "normal");
-    log("Stopping frame pump and capture");
-
-    if (pumping) {
-      FramePumpSystem.stop(ctx);
-      pumping = false;
-    }
-    await CaptureSystem.dispose(ctx);
-
-    // Remove only videos; keep ThreeJS canvas from the plugin
-    if (viewport) {
-      [...viewport.querySelectorAll("video")].forEach((v) => v.remove());
-    }
-
-    cameraStarted = false;
-    setStatus("Webcam stopped.", "success");
-    log("Webcam stopped.");
-    startBtn.disabled = false;
-    stopBtn.disabled = true;
-  } catch (err) {
-    log("Stop error: " + (err?.message || err));
-    setStatus("Stop error (see console)", "error");
-  }
+  // Stopped first, so a frame still in flight is ignored by the listener.
+  cameraStarted = false;
+  framesFlowing = false;
+  // Taken before dispose, which removes the frame-source resource the
+  // element is looked up from.
+  const videoEl = videoElement();
+  FramePumpSystem.stop(ctx);
+  await CaptureSystem.dispose(ctx);
+  videoEl?.remove();
+  stopBtn.disabled = true;
+  startBtn.disabled = false;
+  updateLoadButton();
+  setStatus("Webcam stopped.", "success");
+  log("Webcam stopped");
 }
 
-async function loadMarker() {
-  if (!artoolkit) return;
+async function loadMarkers() {
+  loadBtn.disabled = true;
+  setStatus("Loading markers…");
   try {
-    loadBtn.disabled = true;
-    setStatus("Loading marker…", "normal");
-
-    const res = await artoolkit.loadMarker(hiroUrl, 1);
-    const markerId = res.markerId;
-    log(`loadMarker result: ${JSON.stringify(res)}`);
+    const hiro = await artoolkit.loadMarker("/data/patt.hiro", 1);
+    log(`loadMarker hiro: ${JSON.stringify(hiro)}`);
+    const barcode = await artoolkit.trackBarcode(0, 1);
+    log(`trackBarcode 0: ${JSON.stringify(barcode)}`);
+    markersLoaded = true;
     setStatus(
-      `Marker loaded (id=${markerId}). Show the marker to the camera.`,
+      "Markers loaded: show the Hiro pattern or barcode 0 to the camera.",
       "success",
     );
-    // Note: anchor content is added on ar:getMarker events.
   } catch (err) {
-    log("loadMarker failed: " + (err?.message || err));
-    setStatus("Failed to load marker", "error");
+    log(`Loading markers failed: ${err?.message || err}`);
+    setStatus("Loading markers failed (see the log)", "error");
   } finally {
-    loadBtn.disabled = false;
+    updateLoadButton();
   }
 }
 
-// Wire up UI events
 startBtn.addEventListener("click", () => startWebcam());
 stopBtn.addEventListener("click", () => stopWebcam());
-loadBtn.addEventListener("click", () => loadMarker());
+loadBtn.addEventListener("click", () => loadMarkers());
 
-// Bootstrap on load
 bootstrap().catch((e) => {
-  console.error("[artoolkit+three] bootstrap error:", e);
-  setStatus("Initialization error", "error");
+  console.error("[threejs-example] bootstrap error:", e);
+  log(`Initialisation error: ${e?.message || e}`);
+  setStatus(`Initialisation error: ${e?.message || e}`, "error");
 });

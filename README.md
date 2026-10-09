@@ -73,18 +73,24 @@ Outputs:
 - CJS: `dist/arjs-plugin-threejs.js`
 - Source maps included
 
-Serve the example (choose one):
+### Run the example
+
+`examples/minimal` is a standalone Vite project: a cube on the Hiro pattern
+and a sphere on the 3x3 barcode 0. AR.js-next, arjs-plugin-artoolkit and
+Three.js come from npm; this plugin is linked from the repository root
+(`file:../..`), so build the root first:
 
 ```bash
-# If example has its own dev scripts
+npm install
+npm run build
 cd examples/minimal
-npm i
+npm install
 npm run dev
-
-# OR from repo root (so relative dist path works)
-npx http-server .
-# Open: http://localhost:8080/examples/minimal/
 ```
+
+Open http://localhost:3000/ (camera access needs `localhost` or HTTPS), start
+the webcam, then load the markers once "Load markers" enables. Rebuild the
+root after changing `src/`.
 
 ## Quick start (Engine + Artoolkit + Three.js plugin) 🚀
 
