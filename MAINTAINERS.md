@@ -8,6 +8,19 @@ release issue from the "Release" template, and a tag pushed on `main`
 **after** `dev` → `main` is merged, followed by re-syncing `dev` with
 `git merge --ff-only origin/main`.
 
+## Changelog
+
+`CHANGELOG.md` follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+A PR with a user-visible change adds its entry under `## [Unreleased]`, so at
+release time the section only needs checking and dating:
+
+1. Check `## [Unreleased]` against the milestone's closed issues and merged
+   PRs. Every breaking change is marked **Breaking** and says what consumers
+   must change.
+2. In the version-bump commit, rename it to `## [X.Y.Z] - YYYY-MM-DD` and add
+   a new, empty `## [Unreleased]` above it.
+3. Update the compare links at the bottom.
+
 ## What differs in this repository
 
 - **Ship before the tracker when the event contract changes.** This plugin

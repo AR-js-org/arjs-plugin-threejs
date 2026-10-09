@@ -53,9 +53,11 @@ describe("ThreeJSRendererPlugin (extended)", () => {
   });
 
   function emitGetMarker(id, matrixArray, confidence = 0.9) {
-    engine.eventBus.emit("ar:getMarker", {
+    engine.eventBus.emit("ar:markerFound", {
+      markerId: id,
+      type: "pattern",
       matrix: matrixArray,
-      marker: { markerId: id, confidence },
+      confidence,
     });
   }
 
@@ -68,7 +70,7 @@ describe("ThreeJSRendererPlugin (extended)", () => {
       container,
       preferRAF: false,
       rendererFactory: () => fakeA,
-      useLegacyAxisChain: true,
+      matrixConvention: "legacy",
     });
     await legacy.init(engine);
     await legacy.enable();
@@ -82,7 +84,7 @@ describe("ThreeJSRendererPlugin (extended)", () => {
       container,
       preferRAF: false,
       rendererFactory: () => fakeB,
-      useLegacyAxisChain: false,
+      matrixConvention: "webgl",
       invertModelView: false,
       applyAxisFix: false,
     });
@@ -105,7 +107,7 @@ describe("ThreeJSRendererPlugin (extended)", () => {
       container,
       preferRAF: false,
       rendererFactory: () => fakeM,
-      useLegacyAxisChain: true,
+      matrixConvention: "legacy",
       changeMatrixMode: "modelViewMatrix",
     });
     await mvPlugin.init(engine);
@@ -118,7 +120,7 @@ describe("ThreeJSRendererPlugin (extended)", () => {
       container,
       preferRAF: false,
       rendererFactory: () => fakeC,
-      useLegacyAxisChain: true,
+      matrixConvention: "legacy",
       changeMatrixMode: "cameraTransformMatrix",
     });
     await ctPlugin.init(engine);
@@ -129,7 +131,7 @@ describe("ThreeJSRendererPlugin (extended)", () => {
     expect(anchorMV.position.equals(anchorCT.position)).toBeFalsy();
   });
 
-  it("ignores ar:getMarker events below minConfidence", async () => {
+  it("ignores markerFound events below minConfidence", async () => {
     const fake = makeFakeRenderer();
     const plugin = new ThreeJSRendererPlugin({
       container,

@@ -27,6 +27,9 @@ dist/**/*.map
 .prettierrc*
 .editorconfig
 
+# docs kept out of the package (#7)
+CHANGELOG.md
+
 # environment
 .env
 .env.local

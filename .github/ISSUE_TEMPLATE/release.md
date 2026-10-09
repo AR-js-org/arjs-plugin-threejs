@@ -20,6 +20,7 @@ Roadmap: https://github.com/orgs/AR-js-org/projects/2
 
 - [ ] Milestone has no open items
 - [ ] CI green on `dev`
+- [ ] `CHANGELOG.md`: `[Unreleased]` checked against the milestone and dated (see `MAINTAINERS.md` → Changelog)
 - [ ] Version bumped and upgrade notes written (PR into `dev`)
 - [ ] `dev` merged into `main`
 - [ ] Tag `vX.Y.Z` pushed **after** the merge, on `main`

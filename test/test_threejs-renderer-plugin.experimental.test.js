@@ -37,12 +37,13 @@ function makeFakeRenderer() {
   };
 }
 
-// Helper to emit a single ar:getMarker with configurable confidence
+// Helper to emit a single ar:markerFound with configurable confidence
 function emitGetMarker(engine, id, matrixArray, confidence = 1.0) {
-  engine.eventBus.emit("ar:getMarker", {
-    type: 0,
+  engine.eventBus.emit("ar:markerFound", {
+    markerId: id,
+    type: "pattern",
     matrix: matrixArray,
-    marker: { markerId: id, confidence },
+    confidence,
   });
 }
 
@@ -63,7 +64,7 @@ describe("ThreeJSRendererPlugin (experimental path & flags)", () => {
       preferRAF: false,
       rendererFactory: () => fake,
       // Experimental path: legacy chain off
-      useLegacyAxisChain: false,
+      matrixConvention: "webgl",
       invertModelView: true, // <- ensure inversion
       applyAxisFix: false,
     });
@@ -88,7 +89,7 @@ describe("ThreeJSRendererPlugin (experimental path & flags)", () => {
       container,
       preferRAF: false,
       rendererFactory: () => fakeA,
-      useLegacyAxisChain: false,
+      matrixConvention: "webgl",
       invertModelView: false,
       applyAxisFix: false,
     });
@@ -109,7 +110,7 @@ describe("ThreeJSRendererPlugin (experimental path & flags)", () => {
       container,
       preferRAF: false,
       rendererFactory: () => fakeB,
-      useLegacyAxisChain: false,
+      matrixConvention: "webgl",
       invertModelView: false,
       applyAxisFix: true, // <- only this differs
     });
@@ -135,7 +136,7 @@ describe("ThreeJSRendererPlugin (experimental path & flags)", () => {
       container,
       preferRAF: false,
       rendererFactory: () => fake,
-      useLegacyAxisChain: true,
+      matrixConvention: "legacy",
     });
     await plugin.init(engine);
     await plugin.enable();
@@ -153,7 +154,7 @@ describe("ThreeJSRendererPlugin (experimental path & flags)", () => {
       preferRAF: false,
       rendererFactory: () => fake,
       minConfidence: 0.95, // high threshold
-      useLegacyAxisChain: true,
+      matrixConvention: "legacy",
     });
     await plugin.init(engine);
     await plugin.enable();

@@ -41,47 +41,51 @@ Lifecycle: `init(engine)` creates renderer, scene, camera and lights
 the canvas, subscribes to events and starts the rAF loop; `disable()` undoes
 that; `dispose()` also removes anchors and disposes the renderer.
 
-Public getters: `getAnchor(id)`, `getScene()`, `getCamera()`,
-`getRenderer()`.
+Public getters: `getAnchor(markerId, type = 'pattern')`, `getScene()`,
+`getCamera()`, `getRenderer()`.
 
 ## Events consumed
 
 | Event                                | Handler                                                    |
 | ------------------------------------ | ---------------------------------------------------------- |
-| `ar:markerFound`, `ar:markerUpdated` | `_adaptLegacy(d, true)` → `handleUnifiedMarker`            |
-| `ar:markerLost`                      | `_adaptLegacy(d, false)` → `handleUnifiedMarker`           |
-| `ar:marker`                          | `handleUnifiedMarker` (internal unified shape)             |
-| `ar:getMarker`                       | `handleRawGetMarker` (removed upstream in artoolkit 0.2.0) |
-| `ar:camera`                          | `handleCamera` (projection matrix)                         |
+| `ar:markerFound`, `ar:markerUpdated` | `normalizeMarker(d, true)` → `_applyMarker`                |
+| `ar:markerLost`                      | `normalizeMarker(d, false)` → `_applyMarker`               |
+| `ar:marker`                          | `handleUnifiedMarker` → `normalizeMarker` → `_applyMarker` |
+| `ar:camera`                          | `handleCamera` (projection matrix, AR projection set)      |
 | `engine:update`                      | `handleUpdate` (render)                                    |
+
+`ar:getMarker` is no longer handled (0.2.0): artoolkit stopped emitting it.
+`src/marker.js` holds the payload logic: `toMatrix16`, `markerKey` and
+`normalizeMarker`, which reads the new field names first and the 0.1.x ones
+as the fallback.
 
 Upstream payloads (arjs-plugin-artoolkit ≥ 0.2.0):
 `{ markerId, type, matrix: Float32Array(16), confidence, vertex, dir, timestamp }`
 for found/updated and `{ markerId, type, timestamp }` for lost.
 
-### Invariants to keep (and currently violated — see milestone v0.2.0)
+### Invariants to keep
 
-- **Anchors are keyed by `type:markerId`.** Pattern and barcode IDs both
-  start at 0, so keying by ID alone merges two different markers (#5).
-- **Matrices may be typed arrays.** Accept anything with
-  `ArrayBuffer.isView(m) || Array.isArray(m)` and length 16. Today
-  `Array.isArray` silently drops every `Float32Array` pose.
+- **Anchors are keyed by `type:markerId`** (`markerKey`). Pattern and barcode
+  IDs both start at 0, so keying by ID alone merges two different markers
+  (#5). `getAnchor(markerId, type = 'pattern')`.
+- **Matrices may be typed arrays.** Everything goes through `toMatrix16`
+  (`Array.isArray` or `ArrayBuffer.isView`, length 16), never `Array.isArray`
+  alone, which silently dropped every `Float32Array` pose before 0.2.0.
 - **Matrix convention:** artoolkit ≥ 0.2.0 sends a matrix already in the
-  WebGL/Three convention. The legacy axis chain
-  `R_y(π)·R_z(π)·M·R_x(π/2)` (`useLegacyAxisChain`, default `true`) exists for
-  the old artoolkit5-js output; verify visually with a Hiro marker before
-  changing its default.
+  WebGL/Three convention, so `matrixConvention` defaults to `'webgl'`. The
+  legacy chain `R_y(π)·R_z(π)·M·R_x(π/2)` is `'legacy'`, for artoolkit5-js
+  output. `useLegacyAxisChain` maps onto it with a warning.
+- **The AR projection survives resizes.** After `ar:camera`,
+  `_resizeToContainer` only resizes the renderer; `updateProjectionMatrix()`
+  would replace the AR projection with a generic one.
+- **Payload buffers are not retained.** artoolkit5-ts reuses its matrix
+  buffers, so anchors copy (`fromArray`), and `userData.vertex` is a copy.
 
 ## Known issues (each needs its own change)
 
-- `ar:marker` stores anchors under the raw id while `getAnchor` stringifies:
-  numeric ids are not found.
-- `...options` is spread after the defaults, so `undefined` overrides them.
-- A window resize calls `camera.updateProjectionMatrix()`, overwriting the AR
-  projection set by `ar:camera`.
-- `minConfidence` only filters `ar:getMarker`.
-- `src/index.js` does not export `THREEJS_RENDERER_PLUGIN_VERSION`.
 - With `preferRAF` and `engine:update` both active, a frame can render twice.
+- No `.gitattributes`: a Windows checkout gets CRLF and `format:check` fails
+  locally against Prettier's `lf` default (CI, on Linux, is clean).
 
 ## Conventions
 
