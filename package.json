@@ -60,10 +60,14 @@
   },
   "peerDependencies": {
     "@ar-js-org/ar.js-next": "^0.2.0",
+    "@types/three": ">=0.182.0",
     "three": ">=0.182.0"
   },
   "peerDependenciesMeta": {
     "@ar-js-org/ar.js-next": {
+      "optional": true
+    },
+    "@types/three": {
       "optional": true
     }
   }

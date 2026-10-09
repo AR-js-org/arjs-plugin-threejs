@@ -150,6 +150,8 @@ export class ThreeJSRendererPlugin {
 
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(60, 1, 0.01, 2000);
+    // A fresh camera has no AR projection yet, even on a reused instance.
+    this._hasArProjection = false;
 
     // Lighting
     this.scene.add(new THREE.AmbientLight(0xffffff, 0.6));
@@ -237,6 +239,7 @@ export class ThreeJSRendererPlugin {
     this.renderer = null;
     this.scene = null;
     this.camera = null;
+    this._hasArProjection = false;
     this.engine = null;
     this.emitter = null;
     console.log("[ThreeJSRendererPlugin] Disposed v" + this.version);

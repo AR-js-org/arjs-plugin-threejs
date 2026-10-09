@@ -151,4 +151,23 @@ describe("matrixConvention and the AR projection", () => {
 
     expect(camera.aspect).not.toBe(0.5);
   });
+
+  it("dispose then init forgets the AR projection: the new camera tracks resizes", async () => {
+    await start();
+    engine.eventBus.emit("ar:camera", {
+      projectionMatrix: new Float32Array([
+        2, 0, 0, 0, 0, 3, 0, 0, 0, 0, -1, -1, 0, 0, -0.2, 0,
+      ]),
+    });
+    plugin.dispose();
+
+    await plugin.init(engine);
+    await plugin.enable();
+    const camera = plugin.getCamera();
+    camera.aspect = 0.5;
+
+    window.dispatchEvent(new Event("resize"));
+
+    expect(camera.aspect).not.toBe(0.5);
+  });
 });

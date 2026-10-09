@@ -328,7 +328,9 @@ import type {
 } from "@ar-js-org/arjs-plugin-threejs";
 ```
 
-`getAnchor` returns a `THREE.Group`, typed through `@types/three`.
+`getAnchor` returns a `THREE.Group`, typed through `@types/three`. `three`
+ships no declarations, so TypeScript consumers install `@types/three` too
+(an optional peer dependency); without it `getAnchor` resolves to `any`.
 `npm run test:types` compiles a consumer-style file against the built
 declarations, and CI runs it.
 

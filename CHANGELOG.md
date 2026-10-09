@@ -35,6 +35,8 @@ Planned as 0.2.0, to match arjs-plugin-artoolkit 0.2.0 and later.
 - Peer dependencies: `three` 0.182 or later, and `@ar-js-org/ar.js-next`
   ^0.2.0 as an optional peer: the plugin only needs an event bus with
   `on`/`off`/`emit`, so npm does not install AR.js-next for you.
+  `@types/three` is an optional peer too: the declarations reference
+  `three` types, and `three` ships none.
 
 ### Added
 
