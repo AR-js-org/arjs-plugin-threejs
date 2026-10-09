@@ -68,7 +68,7 @@ describe("ThreeJSRendererPlugin (extended)", () => {
       container,
       preferRAF: false,
       rendererFactory: () => fakeA,
-      useLegacyAxisChain: true,
+      matrixConvention: "legacy",
     });
     await legacy.init(engine);
     await legacy.enable();
@@ -82,7 +82,7 @@ describe("ThreeJSRendererPlugin (extended)", () => {
       container,
       preferRAF: false,
       rendererFactory: () => fakeB,
-      useLegacyAxisChain: false,
+      matrixConvention: "webgl",
       invertModelView: false,
       applyAxisFix: false,
     });
@@ -105,7 +105,7 @@ describe("ThreeJSRendererPlugin (extended)", () => {
       container,
       preferRAF: false,
       rendererFactory: () => fakeM,
-      useLegacyAxisChain: true,
+      matrixConvention: "legacy",
       changeMatrixMode: "modelViewMatrix",
     });
     await mvPlugin.init(engine);
@@ -118,7 +118,7 @@ describe("ThreeJSRendererPlugin (extended)", () => {
       container,
       preferRAF: false,
       rendererFactory: () => fakeC,
-      useLegacyAxisChain: true,
+      matrixConvention: "legacy",
       changeMatrixMode: "cameraTransformMatrix",
     });
     await ctPlugin.init(engine);

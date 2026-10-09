@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { toMatrix16 } from "./marker.js";
 
 // Version injected at build time by Vite define.
 // If the define is missing (e.g. in a non-Vite test harness), fallback to 'unknown'.
@@ -26,30 +27,49 @@ export class ThreeJSRendererPlugin {
     this.camera = null;
     this.anchors = new Map();
 
+    // An option passed as undefined keeps its default rather than erasing it.
+    const given = Object.fromEntries(
+      Object.entries(options).filter(([, value]) => value !== undefined),
+    );
+
+    // useLegacyAxisChain (0.1.x) is replaced by matrixConvention.
+    if (given.useLegacyAxisChain !== undefined) {
+      console.warn(
+        "[ThreeJSRendererPlugin] useLegacyAxisChain is replaced by matrixConvention ('webgl' | 'legacy').",
+      );
+      given.matrixConvention ??= given.useLegacyAxisChain ? "legacy" : "webgl";
+      delete given.useLegacyAxisChain;
+    }
+
     this.options = {
-      antialias: options.antialias ?? true,
-      alpha: options.alpha ?? true,
-      preferRAF: options.preferRAF ?? true, // render even if engine:update absent
-      container: options.container || null, // DOM node to mount canvas
-      minConfidence: options.minConfidence ?? 0, // optional filter for e.marker.confidence
+      antialias: true,
+      alpha: true,
+      preferRAF: true, // render even if engine:update absent
+      container: null, // DOM node to mount canvas
+      minConfidence: 0, // markers below this confidence are ignored
 
-      // Legacy AR.js transform chain (defaults match classic AR.js)
-      useLegacyAxisChain: options.useLegacyAxisChain ?? true,
-      changeMatrixMode: options.changeMatrixMode || "modelViewMatrix",
+      // 'webgl': the matrix is used as is, the convention arjs-plugin-artoolkit
+      // >= 0.2.0 emits. 'legacy': the classic AR.js axis chain, for
+      // artoolkit5-js poses.
+      matrixConvention: "webgl",
+      changeMatrixMode: "modelViewMatrix", // 'legacy' only
 
-      // Experimental (ignored if useLegacyAxisChain = true)
-      invertModelView: options.invertModelView ?? false,
-      applyAxisFix: options.applyAxisFix ?? false,
+      // 'webgl' only
+      invertModelView: false,
+      applyAxisFix: false,
 
-      // NEW: Debug helpers (default off)
-      debugSceneAxes: options.debugSceneAxes ?? false,
-      sceneAxesSize: options.sceneAxesSize ?? 2,
-      debugAnchorAxes: options.debugAnchorAxes ?? false,
-      anchorAxesSize: options.anchorAxesSize ?? 0.5,
-      // NEW: dependency injection for tests
-      rendererFactory: options.rendererFactory || null,
-      ...options,
+      // Debug helpers (default off)
+      debugSceneAxes: false,
+      sceneAxesSize: 2,
+      debugAnchorAxes: false,
+      anchorAxesSize: 0.5,
+      // Dependency injection for tests
+      rendererFactory: null,
+      ...given,
     };
+
+    // Set once an AR projection arrives on ar:camera; a resize then leaves it.
+    this._hasArProjection = false;
 
     this._rafId = 0;
 
@@ -59,7 +79,7 @@ export class ThreeJSRendererPlugin {
       .multiply(new THREE.Matrix4().makeRotationZ(Math.PI));
 
     console.log(`[ThreeJSRendererPlugin] v${this.version} constructed`, {
-      legacyAxisChain: this.options.useLegacyAxisChain,
+      matrixConvention: this.options.matrixConvention,
       changeMatrixMode: this.options.changeMatrixMode,
       preferRAF: this.options.preferRAF,
       debugSceneAxes: this.options.debugSceneAxes,
@@ -254,11 +274,12 @@ export class ThreeJSRendererPlugin {
 
     if (typeof visible === "boolean") anchor.visible = visible;
 
-    if (Array.isArray(matrix) && matrix.length === 16) {
-      const modelView = new THREE.Matrix4().fromArray(matrix);
+    const pose = toMatrix16(matrix);
+    if (pose) {
+      const modelView = new THREE.Matrix4().fromArray(pose);
 
       let final;
-      if (this.options.useLegacyAxisChain) {
+      if (this.options.matrixConvention === "legacy") {
         // Legacy chain: R_y(π) * R_z(π) * modelView * R_x(π/2)
         const projectionAxis = new THREE.Matrix4()
           .makeRotationY(Math.PI)
@@ -273,7 +294,7 @@ export class ThreeJSRendererPlugin {
           final.invert();
         }
       } else {
-        // Experimental path
+        // 'webgl': already in the Three.js convention
         final = modelView.clone();
         if (this.options.invertModelView) final.invert();
         if (this.options.applyAxisFix) final.multiply(this._axisFix);
@@ -285,8 +306,9 @@ export class ThreeJSRendererPlugin {
   }
 
   handleCamera(e) {
-    const arr = e?.projectionMatrix || e?.matrix;
-    if (Array.isArray(arr) && arr.length === 16) {
+    const arr = toMatrix16(e?.projectionMatrix) ?? toMatrix16(e?.matrix);
+    if (arr) {
+      this._hasArProjection = true;
       this.camera.projectionMatrix.fromArray(arr);
       this.camera.projectionMatrixInverse
         .copy(this.camera.projectionMatrix)
@@ -312,8 +334,12 @@ export class ThreeJSRendererPlugin {
     const w = container.clientWidth || window.innerWidth;
     const h = container.clientHeight || Math.round((w * 3) / 4);
     this.renderer.setSize?.(w, h);
-    this.camera.aspect = w / h;
-    this.camera.updateProjectionMatrix();
+    // updateProjectionMatrix() rebuilds a generic perspective projection,
+    // which would replace the AR one from ar:camera.
+    if (!this._hasArProjection) {
+      this.camera.aspect = w / h;
+      this.camera.updateProjectionMatrix();
+    }
   }
 
   getAnchor(id) {

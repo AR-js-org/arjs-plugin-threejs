@@ -63,7 +63,7 @@ describe("ThreeJSRendererPlugin (experimental path & flags)", () => {
       preferRAF: false,
       rendererFactory: () => fake,
       // Experimental path: legacy chain off
-      useLegacyAxisChain: false,
+      matrixConvention: "webgl",
       invertModelView: true, // <- ensure inversion
       applyAxisFix: false,
     });
@@ -88,7 +88,7 @@ describe("ThreeJSRendererPlugin (experimental path & flags)", () => {
       container,
       preferRAF: false,
       rendererFactory: () => fakeA,
-      useLegacyAxisChain: false,
+      matrixConvention: "webgl",
       invertModelView: false,
       applyAxisFix: false,
     });
@@ -109,7 +109,7 @@ describe("ThreeJSRendererPlugin (experimental path & flags)", () => {
       container,
       preferRAF: false,
       rendererFactory: () => fakeB,
-      useLegacyAxisChain: false,
+      matrixConvention: "webgl",
       invertModelView: false,
       applyAxisFix: true, // <- only this differs
     });
@@ -135,7 +135,7 @@ describe("ThreeJSRendererPlugin (experimental path & flags)", () => {
       container,
       preferRAF: false,
       rendererFactory: () => fake,
-      useLegacyAxisChain: true,
+      matrixConvention: "legacy",
     });
     await plugin.init(engine);
     await plugin.enable();
@@ -153,7 +153,7 @@ describe("ThreeJSRendererPlugin (experimental path & flags)", () => {
       preferRAF: false,
       rendererFactory: () => fake,
       minConfidence: 0.95, // high threshold
-      useLegacyAxisChain: true,
+      matrixConvention: "legacy",
     });
     await plugin.init(engine);
     await plugin.enable();

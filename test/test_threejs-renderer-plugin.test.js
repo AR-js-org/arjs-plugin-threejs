@@ -62,7 +62,7 @@ describe("ThreeJSRendererPlugin", () => {
       container,
       preferRAF: false,
       rendererFactory: () => fake,
-      useLegacyAxisChain: true,
+      matrixConvention: "legacy",
       changeMatrixMode: "modelViewMatrix",
     });
     await plugin.init(engine);
