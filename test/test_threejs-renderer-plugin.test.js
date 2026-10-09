@@ -87,7 +87,7 @@ describe("ThreeJSRendererPlugin", () => {
     expect(plugin.getCamera().projectionMatrix.elements[10]).toBe(-1);
   });
 
-  it("creates anchor on ar:getMarker and marks visible", async () => {
+  it("creates anchor on ar:markerFound and marks visible", async () => {
     const fake = makeFakeRenderer();
     const plugin = new ThreeJSRendererPlugin({
       container,
@@ -98,9 +98,11 @@ describe("ThreeJSRendererPlugin", () => {
     await plugin.init(engine);
     await plugin.enable();
 
-    engine.eventBus.emit("ar:getMarker", {
+    engine.eventBus.emit("ar:markerFound", {
+      markerId: 3,
+      type: "pattern",
       matrix: new THREE.Matrix4().toArray(),
-      marker: { markerId: 3, confidence: 0.9 },
+      confidence: 0.9,
     });
     const anchor = plugin.getAnchor("3");
     expect(anchor).toBeTruthy();
@@ -132,9 +134,10 @@ describe("ThreeJSRendererPlugin", () => {
     await plugin.init(engine);
     await plugin.enable();
 
-    engine.eventBus.emit("ar:getMarker", {
+    engine.eventBus.emit("ar:markerFound", {
+      markerId: 7,
+      type: "pattern",
       matrix: new THREE.Matrix4().toArray(),
-      marker: { markerId: 7 },
     });
     let anchor = plugin.getAnchor("7");
     expect(anchor.visible).toBe(true);

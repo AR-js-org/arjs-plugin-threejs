@@ -53,9 +53,11 @@ describe("ThreeJSRendererPlugin (extended)", () => {
   });
 
   function emitGetMarker(id, matrixArray, confidence = 0.9) {
-    engine.eventBus.emit("ar:getMarker", {
+    engine.eventBus.emit("ar:markerFound", {
+      markerId: id,
+      type: "pattern",
       matrix: matrixArray,
-      marker: { markerId: id, confidence },
+      confidence,
     });
   }
 
@@ -129,7 +131,7 @@ describe("ThreeJSRendererPlugin (extended)", () => {
     expect(anchorMV.position.equals(anchorCT.position)).toBeFalsy();
   });
 
-  it("ignores ar:getMarker events below minConfidence", async () => {
+  it("ignores markerFound events below minConfidence", async () => {
     const fake = makeFakeRenderer();
     const plugin = new ThreeJSRendererPlugin({
       container,

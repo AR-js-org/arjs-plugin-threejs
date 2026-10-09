@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { toMatrix16 } from "./marker.js";
+import { markerKey, normalizeMarker, toMatrix16 } from "./marker.js";
 
 // Version injected at build time by Vite define.
 // If the define is missing (e.g. in a non-Vite test harness), fallback to 'unknown'.
@@ -139,19 +139,14 @@ export class ThreeJSRendererPlugin {
 
     this._onUpdate = () => this.handleUpdate();
     this._onMarker = (e) => this.handleUnifiedMarker(e);
-    this._onGetMarker = (e) => this.handleRawGetMarker(e);
     this._onCamera = (e) => this.handleCamera(e);
-    this._onLegacyFound = (d) =>
-      this.handleUnifiedMarker(this._adaptLegacy(d, true));
-    this._onLegacyUpdated = (d) =>
-      this.handleUnifiedMarker(this._adaptLegacy(d, true));
-    this._onLegacyLost = (d) =>
-      this.handleUnifiedMarker(this._adaptLegacy(d, false));
+    this._onLegacyFound = (d) => this._applyMarker(normalizeMarker(d, true));
+    this._onLegacyUpdated = (d) => this._applyMarker(normalizeMarker(d, true));
+    this._onLegacyLost = (d) => this._applyMarker(normalizeMarker(d, false));
     this._onResize = () => this.handleResize();
 
     this._sub("engine:update", this._onUpdate);
     this._sub("ar:marker", this._onMarker);
-    this._sub("ar:getMarker", this._onGetMarker);
     this._sub("ar:camera", this._onCamera);
     this._sub("ar:markerFound", this._onLegacyFound);
     this._sub("ar:markerUpdated", this._onLegacyUpdated);
@@ -179,7 +174,6 @@ export class ThreeJSRendererPlugin {
     if (this.emitter?.off) {
       this._off("engine:update", this._onUpdate);
       this._off("ar:marker", this._onMarker);
-      this._off("ar:getMarker", this._onGetMarker);
       this._off("ar:camera", this._onCamera);
       this._off("ar:markerFound", this._onLegacyFound);
       this._off("ar:markerUpdated", this._onLegacyUpdated);
@@ -218,64 +212,70 @@ export class ThreeJSRendererPlugin {
     } catch {}
   }
 
-  _adaptLegacy(d, visible) {
-    return {
-      id: String(d?.markerId ?? d?.id ?? "0"),
-      matrix:
-        d?.matrix ||
-        d?.transformationMatrix ||
-        d?.modelViewMatrix ||
-        d?.poseMatrix ||
-        null,
-      visible,
-      _legacy: true,
-    };
-  }
-
-  handleRawGetMarker(e) {
-    if (!e) return;
-    const confidence = e?.marker?.confidence;
-    if (confidence !== undefined && confidence < this.options.minConfidence)
-      return;
-    const id = String(
-      e?.marker?.markerId ??
-        e?.marker?.id ??
-        e?.marker?.pattHandle ??
-        e?.marker?.uid ??
-        e?.marker?.index ??
-        "0",
-    );
-    const matrix = e?.matrix;
-    this.handleUnifiedMarker({
-      id,
-      matrix,
-      visible: true,
-      _source: "ar:getMarker",
-    });
-  }
-
+  /**
+   * Handles `ar:marker`, the renderer's own unified event
+   * `{ id | markerId, type?, matrix?, visible? }`. Marker events from
+   * arjs-plugin-artoolkit arrive through the same path.
+   *
+   * @param {Object} evt - The event payload
+   * @returns {void}
+   */
   handleUnifiedMarker(evt) {
-    const { id, matrix, visible } = evt || {};
-    if (id == null) return;
+    this._applyMarker(normalizeMarker(evt, evt?.visible));
+  }
 
-    let anchor = this.anchors.get(id);
+  /**
+   * Creates or updates the anchor for a normalised marker.
+   *
+   * @param {import("./marker.js").NormalizedMarker|null} marker
+   * @returns {void}
+   * @private
+   */
+  _applyMarker(marker) {
+    if (!marker || !this.scene) return;
+    const { key, matrix, visible, confidence } = marker;
+
+    // Found/updated below minConfidence is ignored; a loss always applies.
+    if (
+      visible !== false &&
+      confidence !== undefined &&
+      confidence < this.options.minConfidence
+    ) {
+      return;
+    }
+
+    let anchor = this.anchors.get(key);
     if (!anchor) {
+      // A loss for a marker never seen has nothing to hide.
+      if (visible === false) return;
       anchor = new THREE.Group();
-      anchor.name = `marker-${id}`;
+      anchor.name = `marker-${key}`;
       anchor.matrixAutoUpdate = false;
       // Debug: anchor axes (optional)
       if (this.options.debugAnchorAxes) {
         anchor.add(new THREE.AxesHelper(this.options.anchorAxesSize));
       }
       this.scene.add(anchor);
-      this.anchors.set(id, anchor);
-      console.log("[ThreeJSRendererPlugin] anchor created", id);
+      this.anchors.set(key, anchor);
+      console.log("[ThreeJSRendererPlugin] anchor created", key);
     }
 
     if (typeof visible === "boolean") anchor.visible = visible;
 
+    if (visible !== false) {
+      // Copied: the detector reuses its buffers between frames.
+      anchor.userData = {
+        ...anchor.userData,
+        markerId: marker.markerId,
+        type: marker.type,
+        confidence,
+        vertex: marker.vertex?.map((corner) => [corner[0], corner[1]]),
+        dir: marker.dir,
+      };
+    }
+
     const pose = toMatrix16(matrix);
-    if (pose) {
+    if (pose && visible !== false) {
       const modelView = new THREE.Matrix4().fromArray(pose);
 
       let final;
@@ -342,8 +342,16 @@ export class ThreeJSRendererPlugin {
     }
   }
 
-  getAnchor(id) {
-    return this.anchors.get(String(id));
+  /**
+   * The anchor of a marker, keyed by family: pattern and barcode IDs both
+   * start at 0.
+   *
+   * @param {number|string} markerId - The marker's ID within its family
+   * @param {import("./marker.js").MarkerType} [type='pattern'] - The marker family
+   * @returns {THREE.Group|undefined} The anchor, once the marker has been seen
+   */
+  getAnchor(markerId, type = "pattern") {
+    return this.anchors.get(markerKey(markerId, type));
   }
   getScene() {
     return this.scene;

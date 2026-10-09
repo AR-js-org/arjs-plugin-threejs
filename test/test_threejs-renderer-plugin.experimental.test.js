@@ -37,12 +37,13 @@ function makeFakeRenderer() {
   };
 }
 
-// Helper to emit a single ar:getMarker with configurable confidence
+// Helper to emit a single ar:markerFound with configurable confidence
 function emitGetMarker(engine, id, matrixArray, confidence = 1.0) {
-  engine.eventBus.emit("ar:getMarker", {
-    type: 0,
+  engine.eventBus.emit("ar:markerFound", {
+    markerId: id,
+    type: "pattern",
     matrix: matrixArray,
-    marker: { markerId: id, confidence },
+    confidence,
   });
 }
 
