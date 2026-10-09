@@ -49,6 +49,10 @@ Planned as 0.2.0, to match arjs-plugin-artoolkit 0.2.0 and later.
   `CameraEventPayload`, `MatrixConvention`, `ThreeJSRendererPluginOptions`
   and `AnchorUserData`, resolved through a `types` condition in `exports`.
   `THREEJS_RENDERER_PLUGIN_VERSION` is exported from the package entry.
+- `examples/minimal` is a Vite project on the npm packages (AR.js-next,
+  arjs-plugin-artoolkit 0.4.0, Three.js), with a cube on the Hiro pattern and
+  a sphere on the 3x3 barcode 0. It replaces the `vendor/` copies and the
+  `ar:getMarker` bridge, and CI builds it.
 
 ### Fixed
 
