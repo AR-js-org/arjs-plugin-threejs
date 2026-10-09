@@ -13,10 +13,10 @@ jobs:
       HUSKY: 0
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: "npm"
@@ -30,7 +30,7 @@ jobs:
           npm run build:types
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: build-artifacts
           path: |
@@ -45,10 +45,14 @@ jobs:
       contents: write # Required to create GitHub releases
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
+      # v8 here and upload-artifact v7 above is deliberate, not a typo: the two
+      # actions drifted in major version, and the artifact format changed at v4,
+      # which both are past. This step only runs on a tag push, so CI does not
+      # exercise it; if a release fails here, pinning both to v4 is the fallback.
       - name: Download build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: build-artifacts
 
