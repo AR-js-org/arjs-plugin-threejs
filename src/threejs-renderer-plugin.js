@@ -10,12 +10,53 @@ const THREEJS_RENDERER_PLUGIN_VERSION =
 
 export { THREEJS_RENDERER_PLUGIN_VERSION };
 /**
- * Plugin to render THREE.js scenes driven by AR markers.
- * Provides management of renderer, scene, camera and marker anchors.
- * Supported options: antialias, alpha, preferRAF, container, invertModelView, applyAxisFix
+ * How an incoming pose matrix maps onto an anchor. `'webgl'` uses it as is,
+ * the convention arjs-plugin-artoolkit >= 0.2.0 emits; `'legacy'` applies the
+ * classic AR.js axis chain, for artoolkit5-js poses.
+ *
+ * @typedef {'webgl' | 'legacy'} MatrixConvention
+ */
+
+/**
+ * @typedef {Object} ThreeJSRendererPluginOptions
+ * @property {boolean} [antialias=true]
+ * @property {boolean} [alpha=true] - Transparent canvas over the video
+ * @property {boolean} [preferRAF=true] - Render on requestAnimationFrame, not only on engine:update
+ * @property {HTMLElement|null} [container] - Where the canvas is mounted; document.body by default
+ * @property {number} [minConfidence=0] - Found/updated events below this confidence are ignored
+ * @property {MatrixConvention} [matrixConvention='webgl']
+ * @property {'modelViewMatrix' | 'cameraTransformMatrix'} [changeMatrixMode='modelViewMatrix'] - 'legacy' only
+ * @property {boolean} [invertModelView=false] - 'webgl' only
+ * @property {boolean} [applyAxisFix=false] - 'webgl' only
+ * @property {boolean} [useLegacyAxisChain] - Deprecated: use matrixConvention
+ * @property {boolean} [debugSceneAxes=false]
+ * @property {number} [sceneAxesSize=2]
+ * @property {boolean} [debugAnchorAxes=false]
+ * @property {number} [anchorAxesSize=0.5]
+ * @property {((opts: {antialias: boolean, alpha: boolean}) => any) | null} [rendererFactory] - Replaces the WebGLRenderer, for tests
+ */
+
+/**
+ * What an anchor's `userData` holds once its marker has been seen.
+ *
+ * @typedef {Object} AnchorUserData
+ * @property {string} markerId - The marker's ID within its family
+ * @property {import("./marker.js").MarkerType} type - The marker family
+ * @property {number} [confidence] - Last detection confidence
+ * @property {Array<[number, number]>} [vertex] - Last detected corners, a copy
+ * @property {number} [dir] - Last rotation, 0 to 3
+ */
+
+/**
+ * Renders a Three.js scene over the camera view and keeps one anchor
+ * (`THREE.Group`) per marker, keyed `type:markerId`, whose matrix follows the
+ * marker's pose. Applications attach their 3D content to anchors.
  */
 
 export class ThreeJSRendererPlugin {
+  /**
+   * @param {ThreeJSRendererPluginOptions} [options]
+   */
   constructor(options = {}) {
     this.name = "threejs-renderer";
     this.version = THREEJS_RENDERER_PLUGIN_VERSION;
@@ -348,7 +389,7 @@ export class ThreeJSRendererPlugin {
    *
    * @param {number|string} markerId - The marker's ID within its family
    * @param {import("./marker.js").MarkerType} [type='pattern'] - The marker family
-   * @returns {THREE.Group|undefined} The anchor, once the marker has been seen
+   * @returns {import("three").Group|undefined} The anchor, once the marker has been seen
    */
   getAnchor(markerId, type = "pattern") {
     return this.anchors.get(markerKey(markerId, type));

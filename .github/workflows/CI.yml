@@ -25,6 +25,13 @@ jobs:
       - name: Build library
         run: npm run build:vite
 
+      # Builds types/ and type-checks it the way a consumer imports it
+      # (package.json "exports", moduleResolution "bundler").
+      - name: Type declarations
+        run: |
+          npm run build:types
+          npm run test:types
+
       - name: Check formatting
         run: npm run format:check
 

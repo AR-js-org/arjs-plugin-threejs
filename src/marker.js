@@ -13,6 +13,38 @@
  */
 
 /**
+ * `ar:markerFound` and `ar:markerUpdated` as arjs-plugin-artoolkit emits them.
+ *
+ * @typedef {Object} MarkerEventPayload
+ * @property {number} markerId - The marker's ID within its family
+ * @property {MarkerType} type - The marker family
+ * @property {Float32Array} matrix - 4x4 column-major pose, WebGL convention
+ * @property {number} confidence - Detection confidence, 0 to 1
+ * @property {Array<[number, number]>} [vertex] - The four detected corners, in frame pixels
+ * @property {number} [dir] - The marker's rotation, 0 to 3
+ * @property {number} timestamp - When the event was emitted, in ms since the epoch
+ */
+
+/**
+ * `ar:markerLost` as arjs-plugin-artoolkit emits it.
+ *
+ * @typedef {Object} MarkerLostPayload
+ * @property {number} markerId - The marker's ID within its family
+ * @property {MarkerType} type - The marker family
+ * @property {number} timestamp - When the event was emitted, in ms since the epoch
+ */
+
+/**
+ * `ar:camera`: the camera projection that pairs with the poses.
+ *
+ * @typedef {Object} CameraEventPayload
+ * @property {ArrayLike<number>} projectionMatrix - 4x4 column-major projection
+ * @property {number} [width] - Width of the analysed frames, in pixels
+ * @property {number} [height] - Height of the analysed frames, in pixels
+ * @property {number} [timestamp] - When the event was emitted, in ms since the epoch
+ */
+
+/**
  * A marker event normalised for the renderer.
  *
  * @typedef {Object} NormalizedMarker
