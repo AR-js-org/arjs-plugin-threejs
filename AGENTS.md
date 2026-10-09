@@ -41,8 +41,8 @@ Lifecycle: `init(engine)` creates renderer, scene, camera and lights
 the canvas, subscribes to events and starts the rAF loop; `disable()` undoes
 that; `dispose()` also removes anchors and disposes the renderer.
 
-Public getters: `getAnchor(id)`, `getScene()`, `getCamera()`,
-`getRenderer()`.
+Public getters: `getAnchor(markerId, type = 'pattern')`, `getScene()`,
+`getCamera()`, `getRenderer()`.
 
 ## Events consumed
 

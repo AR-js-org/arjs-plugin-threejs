@@ -19,17 +19,22 @@ Planned as 0.2.0, to match arjs-plugin-artoolkit 0.2.0 and later.
   the convention arjs-plugin-artoolkit 0.2.0+ emits. The old default applied
   the classic AR.js axis chain to every pose. Pass
   `matrixConvention: 'legacy'` for artoolkit5-js poses.
-  `useLegacyAxisChain` still works for now, with a warning.
+  `useLegacyAxisChain` still works for now, with a warning, but it is mapped
+  onto `matrixConvention`: `plugin.options.useLegacyAxisChain` no longer
+  exists.
 - **Breaking:** anchors are keyed by `type:markerId`, and
   `getAnchor(markerId, type = 'pattern')` takes the family: pass
   `getAnchor(id, 'barcode')` for barcodes. Pattern 0 and barcode 0 no longer
-  share one anchor (#5).
+  share one anchor (#5). The anchor's `name` changes with it, from
+  `marker-<id>` to `marker-<type>:<id>` (`scene.getObjectByName("marker-0")`
+  becomes `"marker-pattern:0"`), and so do the keys of `plugin.anchors`.
 - **Breaking:** `ar:getMarker` is no longer handled. Listen to
   `ar:markerFound`, `ar:markerUpdated` and `ar:markerLost`.
 - `minConfidence` applies to `ar:markerFound` and `ar:markerUpdated`. It used
   to filter only `ar:getMarker`.
-- Peer dependencies: `three` 0.182 or later and `@ar-js-org/ar.js-next`
-  ^0.2.0.
+- Peer dependencies: `three` 0.182 or later, and `@ar-js-org/ar.js-next`
+  ^0.2.0 as an optional peer: the plugin only needs an event bus with
+  `on`/`off`/`emit`, so npm does not install AR.js-next for you.
 
 ### Added
 

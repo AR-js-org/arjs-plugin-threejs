@@ -239,7 +239,9 @@ new ThreeJSRendererPlugin({});
 ```
 
 **2. Anchors are keyed by family; `getAnchor(id)` means the pattern marker.**
-`ar:getMarker` is no longer handled.
+`ar:getMarker` is no longer handled. Anchor names follow the key, from
+`marker-<id>` to `marker-<type>:<id>`, and so do the keys of `plugin.anchors`:
+look anchors up with `getAnchor` rather than by name.
 
 ```js
 // 0.1.x: bridge ar:getMarker, look the anchor up by id alone
@@ -333,8 +335,8 @@ declarations, and CI runs it.
 ## Compatibility 🔄
 
 - Peer dependencies: `three` 0.182 or later (tested with 0.186), and
-  `@ar-js-org/ar.js-next` ^0.2.0, whose engine provides the event bus
-  (`on/off/emit`)
+  `@ar-js-org/ar.js-next` ^0.2.0 as an optional peer: its engine provides the
+  event bus (`on/off/emit`), but any bus with that interface works
 - Marker events from `@ar-js-org/arjs-plugin-artoolkit` 0.2.0 or later;
   `ar:camera` needs 0.4.0
 - Should work with any tracking plugin that emits the same marker payloads
