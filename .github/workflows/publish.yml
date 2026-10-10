@@ -1,5 +1,24 @@
 name: Publish to npm
 
+# Publishes the package. `release.yml` handles the GitHub Release and its assets;
+# both trigger on the same tag push, kept apart so a failed npm publish does not
+# also lose the release assets and can be re-run on its own.
+#
+# Authenticated by npm **trusted publishing** (OIDC) rather than a token. The
+# runner exchanges a short-lived OIDC token for publish rights, scoped to this
+# repository and this workflow filename as registered on npmjs.com. There is no
+# NPM_TOKEN, nothing to rotate, and no write token to expire (npm caps them at
+# 90 days).
+#
+# Provenance comes for free: publishing this way attests it, so `--provenance`
+# is neither passed nor needed.
+#
+# REQUIRES a trusted publisher on npmjs.com before the first run. npm authorises
+# per workflow *filename*, so the entry must name `publish.yml` - organisation
+# `AR-js-org`, repository `arjs-plugin-threejs`, environment blank. npm does not
+# validate that configuration when it is saved, so a wrong value is accepted
+# silently and only surfaces as a failed publish.
+
 on:
   push:
     tags:
@@ -7,54 +26,126 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Tag name to publish (optional)"
-        required: false
-      publish:
-        description: 'Set to "true" to actually publish on manual dispatch (default: false)'
-        required: false
-        default: "false"
+        description: "Existing release tag to publish, e.g. v0.2.0"
+        required: true
+        type: string
+
+# Two publishes of the same package at once would race on the registry. Never
+# `cancel-in-progress`: cancelling a run that has already published leaves a
+# version on npm that npm will not let be replaced.
+concurrency:
+  group: publish-${{ github.repository }}
+  cancel-in-progress: false
 
 jobs:
   publish:
     runs-on: ubuntu-24.04
+
+    permissions:
+      # Reading the tagged tree.
+      contents: read
+      # Mints the OIDC token npm authenticates with. There is no npm token in
+      # this workflow, so without this the publish cannot authenticate at all.
+      id-token: write
+
     env:
       HUSKY: 0
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
+      # Read through the environment rather than interpolated into `run:`.
+      # `${{ }}` substitution happens before the shell parses anything, so a
+      # dispatch input spliced into a script is executed as code.
+      TAG: ${{ inputs.tag || github.ref_name }}
 
+    steps:
+      # Before the checkout, so an unusable input is rejected without having
+      # fetched anything. Matched with bash's own `=~` rather than grep, which is
+      # line-oriented: a multi-line value would match on its first line.
+      - name: Validate the tag name
+        run: |
+          TAGPATTERN='^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'
+          if ! [[ "$TAG" =~ $TAGPATTERN ]]; then
+            echo "::error::'$TAG' is not a release tag. Expected vX.Y.Z, optionally with a prerelease suffix."
+            exit 1
+          fi
+          echo "VERSION=${TAG#v}" >> "$GITHUB_ENV"
+
+      # `refs/tags/` fully qualified, deliberately. The previous version of this
+      # workflow never used its `tag` input, so a manual dispatch published
+      # whatever ref it was dispatched from. Now that this workflow carries OIDC
+      # publish authority, that authority extends to released tags only. An
+      # unqualified ref would also let checkout resolve a *branch* of the same
+      # name, which the manifest check below would not tell apart.
+      - name: Checkout the tag
+        uses: actions/checkout@v7
+        with:
+          ref: refs/tags/${{ env.TAG }}
+
+      # 24.x stated here rather than read from .nvmrc. Trusted publishing needs
+      # npm 11.5.1 or newer, which Node 24 ships; pinning the major here keeps
+      # publishing from depending on whatever .nvmrc says later.
+      #
+      # `registry-url` is deliberately NOT set. It makes setup-node write an
+      # .npmrc line reading `_authToken=${NODE_AUTH_TOKEN}`; with no token in the
+      # environment npm decides authentication is already configured and never
+      # performs the OIDC exchange, failing with 403 or ENEEDAUTH.
+      # registry.npmjs.org is npm's default anyway. npm's own example workflow
+      # still includes it, so this is easy to reintroduce by copying the docs -
+      # see actions/setup-node#1551 and npm/documentation#1960.
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version-file: .nvmrc
-          cache: "npm"
-          registry-url: "https://registry.npmjs.org"
-
-      - name: Determine tag
-        id: tag
-        run: |
-          if [ -n "${{ github.event.inputs.tag }}" ]; then
-            echo "tag=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
-          else
-            ref_name=${GITHUB_REF##*/}
-            echo "tag=$ref_name" >> $GITHUB_OUTPUT
-          fi
+          node-version: "24.x"
 
       - name: Install dependencies
         run: npm ci
 
+      # The tag names what is being published, so a tag that disagrees with the
+      # manifest means the wrong tree. Refuse rather than publish something
+      # under a version nobody asked for.
+      - name: Check the tag matches the manifest
+        run: |
+          ACTUAL="$(node -p "require('./package.json').version")"
+          if [ "$VERSION" != "$ACTUAL" ]; then
+            echo "::error::Tag $TAG implies version $VERSION but package.json says $ACTUAL."
+            exit 1
+          fi
+          echo "Tag $TAG matches package.json $ACTUAL."
+
+      # npm refuses an existing version on its own, but with an E403 that reads
+      # like an authentication failure. Checking first means a re-run says
+      # plainly there is nothing to do.
+      - name: Check the version is not already published
+        run: |
+          NAME="$(node -p "require('./package.json').name")"
+          if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
+            echo "::error::$NAME@$VERSION is already on npm. Nothing to publish."
+            exit 1
+          fi
+          echo "$NAME@$VERSION is unpublished."
+
+      # `npm run build` builds dist/ and types/. No `|| true` on the
+      # declarations any more: a failed types build stops the publish.
       - name: Build
+        run: npm run build
+
+      # The entry points a consumer resolves, loaded by name through require()
+      # and import() (#19), then the tarball listing for the log.
+      - name: Check what would be published
         run: |
-          npm run build
-          npm run build:types || true
+          npm run test:exports
+          npm pack --dry-run
 
-      - name: Verify package contents (dry-run)
-        run: npm pack --dry-run
-
+      # Authenticated by trusted publishing (OIDC). `--access public` is
+      # required for a scoped package; npm otherwise defaults it to restricted.
       - name: Publish to npm
-        if: ${{ github.event.inputs.publish == 'true' || startsWith(github.ref, 'refs/tags/') }}
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public
+
+      - name: Summarise
         run: |
-          echo "Publishing package to npm"
-          npm publish --access public
+          NAME="$(node -p "require('./package.json').name")"
+          {
+            echo "### Published $NAME@$VERSION from $TAG"
+            echo ""
+            echo "- npm: https://www.npmjs.com/package/$NAME/v/$VERSION"
+            echo ""
+            echo "Published with provenance over OIDC - no token involved."
+          } >> "$GITHUB_STEP_SUMMARY"
