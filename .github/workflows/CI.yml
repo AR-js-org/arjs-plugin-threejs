@@ -25,6 +25,11 @@ jobs:
       - name: Build library
         run: npm run build:vite
 
+      # Loads the built package by name through require() and import(), as a
+      # CommonJS and an ESM consumer would (#19).
+      - name: Entry points
+        run: npm run test:exports
+
       # Builds types/ and type-checks it the way a consumer imports it
       # (package.json "exports", moduleResolution "bundler").
       - name: Type declarations
