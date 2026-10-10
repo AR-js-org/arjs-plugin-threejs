@@ -123,4 +123,7 @@ claude plugin install arjs@arjs-dev-tools --scope project
 
 A new session's `/hooks` then lists both as `arjs@arjs-dev-tools`. Without
 the install neither runs: `enabledPlugins` alone registers the marketplace
-but does not load the plugin.
+but does not load the plugin. `main` stays protected either way: GitHub's
+"Protect main" ruleset requires a pull request and refuses force pushes and
+deletion, with no bypass. Formatting is then checked only by CI's
+`format:check`; lint does not run in CI.
