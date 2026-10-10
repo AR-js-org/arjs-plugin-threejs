@@ -40,6 +40,10 @@ Matches arjs-plugin-artoolkit 0.2.0 and later; the camera projection
   `on`/`off`/`emit`, so npm does not install AR.js-next for you.
   `@types/three` is an optional peer too: the declarations reference
   `three` types, and `three` ships none.
+- The npm package holds only `dist/` and `types/` (without source maps), the
+  README, LICENSE and `package.json`, through `files` in `package.json`.
+  0.1.1 also shipped `tsconfig.json`, the vite and vitest configs, `.nvmrc`
+  and `.prettierignore`.
 
 ### Added
 

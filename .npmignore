@@ -1,3 +1,8 @@
+# package.json `files` decides what is published: dist/ and types/ without
+# source maps, plus the README, LICENSE and package.json npm always adds. A
+# new file at the root stays out because `files` does not list it, not
+# because of this list. Check the result with `npm pack --dry-run`.
+
 # OS / editor
 .DS_Store
 .vscode/
