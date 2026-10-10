@@ -10,7 +10,10 @@ a minor version may break the API; every breaking change is marked
 
 ## [Unreleased]
 
-Planned as 0.2.0, to match arjs-plugin-artoolkit 0.2.0 and later.
+## [0.2.0] - 2026-10-10
+
+Matches arjs-plugin-artoolkit 0.2.0 and later; the camera projection
+(`ar:camera`) needs 0.4.0.
 
 ### Changed
 
@@ -53,6 +56,7 @@ Planned as 0.2.0, to match arjs-plugin-artoolkit 0.2.0 and later.
   arjs-plugin-artoolkit 0.4.0, Three.js), with a cube on the Hiro pattern and
   a sphere on the 3x3 barcode 0. It replaces the `vendor/` copies and the
   `ar:getMarker` bridge, and CI builds it.
+- This changelog (#7).
 
 ### Fixed
 
@@ -75,7 +79,9 @@ Planned as 0.2.0, to match arjs-plugin-artoolkit 0.2.0 and later.
 - eslint 10, vite 8, vitest 5 with `@vitest/coverage-v8` 5, jsdom 29 and
   TypeScript 6 (with `nodenext`, `rootDir` and `strict: false`, so `types/`
   is unchanged). vite 8 bundles with Rolldown: same files and exports, and
-  the ESM entry drops the JSDoc comments vite 7 kept.
+  the ESM entry drops the JSDoc comments vite 7 kept (#11).
+- CI runs eslint (#17), and checks that the built package loads through
+  `require()` and `import()` (#19).
 - Published from GitHub Actions with npm trusted publishing (OIDC) instead of
   an `NPM_TOKEN`, so each version carries a provenance attestation (#16).
 
@@ -85,5 +91,6 @@ First release as `@ar-js-org/arjs-plugin-threejs`: a WebGL canvas over the
 camera view, one `THREE.Group` anchor per marker driven by AR.js marker
 events, the camera projection from `ar:camera`, and debug axes helpers.
 
-[Unreleased]: https://github.com/AR-js-org/arjs-plugin-threejs/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/AR-js-org/arjs-plugin-threejs/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/AR-js-org/arjs-plugin-threejs/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/AR-js-org/arjs-plugin-threejs/releases/tag/v0.1.1
