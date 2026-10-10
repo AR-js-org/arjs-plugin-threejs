@@ -49,8 +49,9 @@ jobs:
 
       # v8 here and upload-artifact v7 above is deliberate, not a typo: the two
       # actions drifted in major version, and the artifact format changed at v4,
-      # which both are past. This step only runs on a tag push, so CI does not
-      # exercise it; if a release fails here, pinning both to v4 is the fallback.
+      # which both are past. This step runs on a tag push or a manual dispatch of
+      # this workflow, never in CI; if a release fails here, pinning both to v4
+      # is the fallback.
       - name: Download build artifacts
         uses: actions/download-artifact@v8
         with:
