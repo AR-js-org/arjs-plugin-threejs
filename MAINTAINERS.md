@@ -26,12 +26,33 @@ release time the section only needs checking and dating:
 - **Ship before the tracker when the event contract changes.** This plugin
   consumes `ar:marker*` payloads; when arjs-plugin-artoolkit changes them,
   release this side first, reading both old and new shapes.
-- **npm publishing uses the `NPM_TOKEN` secret** (`publish.yml`, with
-  `registry-url` set on setup-node). It runs on the `v*.*.*` tag, or by
-  manual dispatch with `publish: true`. The dispatch `tag` input is currently
-  unused, so a manual run publishes whatever ref it was dispatched from:
-  dispatch it **from the tag**, not from a branch.
-- `publish.yml` runs `build:types || true`, so a failed declaration build
-  does not stop a publish. Check `types/` in `npm pack --dry-run` output.
+- **npm publishing uses trusted publishing (OIDC)**, with no token
+  (`publish.yml`, #16). It runs on the `v*.*.*` tag push, or by manual
+  dispatch with an existing tag as its `tag` input; either way it checks out
+  that tag and refuses one that disagrees with `package.json`. The trusted
+  publisher on npmjs.com names organisation `AR-js-org`, repository
+  `arjs-plugin-threejs`, workflow `publish.yml` and no environment.
 - `release.yml` re-runs `build:types` after `npm run build` (which already
   ran it); harmless, but slower.
+
+## Trusted publishing traps
+
+- **Do not set `registry-url` on setup-node** in `publish.yml`. It writes an
+  `.npmrc` with `_authToken=${NODE_AUTH_TOKEN}`; with no token npm believes
+  auth is configured and never performs the OIDC exchange. npm's own example
+  workflow includes it, so it is easy to reintroduce by copying the docs.
+- **`publish.yml` must use Node 24.x**, stated in the workflow rather than
+  read from `.nvmrc`. Trusted publishing needs npm ≥ 11.5.1, which Node 24
+  ships; publishing must not depend on what `.nvmrc` says later.
+- npm authorises per workflow **filename** and does not validate the trusted
+  publisher configuration when it is saved. Renaming `publish.yml` breaks
+  publishing silently until the next release.
+- `package.json` `repository.url` must name this repository
+  (`git+https://github.com/AR-js-org/arjs-plugin-threejs.git`): npm checks it
+  against the provenance and rejects a mismatch with E422.
+
+## Do not publish by hand
+
+`dist/` and `types/` are built by the workflows. A manual `npm publish` works
+but carries no provenance attestation. Do not commit them either: both are
+gitignored, so never `git add -f` them into the version-bump commit.
