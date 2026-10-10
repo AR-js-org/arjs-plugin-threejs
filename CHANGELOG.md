@@ -63,6 +63,15 @@ Planned as 0.2.0, to match arjs-plugin-artoolkit 0.2.0 and later.
   `"node16"`, because `exports` had no `types` condition.
 - A loss event for a marker never seen created an empty anchor.
 
+### Development
+
+- Node 24 LTS (`.nvmrc` v24.21.0), whose npm 11 no longer rewrites the
+  lockfile against npm 10.
+- eslint 10, vite 8, vitest 5 with `@vitest/coverage-v8` 5, jsdom 29 and
+  TypeScript 6 (with `nodenext`, `rootDir` and `strict: false`, so `types/`
+  is unchanged). vite 8 bundles with Rolldown: same files and exports, and
+  the ESM entry drops the JSDoc comments vite 7 kept.
+
 ## [0.1.1] - 2025-12-23
 
 First release as `@ar-js-org/arjs-plugin-threejs`: a WebGL canvas over the

@@ -27,7 +27,7 @@ npm run format:check  # prettier --check .
 npm run lint          # eslint
 ```
 
-Node is pinned in `.nvmrc` (v22.21.1). CI (`.github/workflows/CI.yml`) runs
+Node is pinned in `.nvmrc` (v24.21.0). CI (`.github/workflows/CI.yml`) runs
 `npm ci`, `build:vite`, `format:check` and `npm test`.
 
 ## Architecture

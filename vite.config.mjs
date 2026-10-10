@@ -10,7 +10,7 @@ export default defineConfig({
         format === "es" ? "arjs-plugin-threejs.mjs" : "arjs-plugin-threejs.js",
     },
     sourcemap: true,
-    rollupOptions: {
+    rolldownOptions: {
       external: ["three", "ar.js-core"],
       output: {
         globals: {
