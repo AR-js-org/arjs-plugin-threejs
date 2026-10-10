@@ -28,7 +28,8 @@ npm run lint          # eslint
 ```
 
 Node is pinned in `.nvmrc` (v24.21.0). CI (`.github/workflows/CI.yml`) runs
-`npm ci`, `build:vite`, `format:check` and `npm test`.
+`npm ci`, `build:vite`, `build:types` with `test:types`, the
+`examples/minimal` build, `format:check`, `lint` and `npm test`.
 
 ## Architecture
 
