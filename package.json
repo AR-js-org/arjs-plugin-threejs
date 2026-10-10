@@ -3,14 +3,14 @@
   "version": "0.1.1",
   "description": "Three.js renderer plugin for AR.js-core",
   "type": "module",
-  "main": "dist/arjs-plugin-threejs.js",
+  "main": "dist/arjs-plugin-threejs.cjs",
   "module": "dist/arjs-plugin-threejs.mjs",
   "types": "types/index.d.ts",
   "exports": {
     ".": {
       "types": "./types/index.d.ts",
       "import": "./dist/arjs-plugin-threejs.mjs",
-      "require": "./dist/arjs-plugin-threejs.js",
+      "require": "./dist/arjs-plugin-threejs.cjs",
       "default": "./dist/arjs-plugin-threejs.mjs"
     }
   },
@@ -28,7 +28,8 @@
     "serve:vite": "vite preview",
     "test": "vitest run --coverage",
     "test:watch": "vitest",
-    "test:types": "tsc -p test/typecheck"
+    "test:types": "tsc -p test/typecheck",
+    "test:exports": "node dev/check-exports.mjs"
   },
   "keywords": [
     "ar.js",

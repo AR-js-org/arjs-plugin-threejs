@@ -70,7 +70,7 @@ npm run build:vite
 Outputs:
 
 - ESM: `dist/arjs-plugin-threejs.mjs`
-- CJS: `dist/arjs-plugin-threejs.js`
+- CJS: `dist/arjs-plugin-threejs.cjs`
 - Source maps included
 
 ### Run the example

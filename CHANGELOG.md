@@ -56,6 +56,11 @@ Planned as 0.2.0, to match arjs-plugin-artoolkit 0.2.0 and later.
 
 ### Fixed
 
+- `require("@ar-js-org/arjs-plugin-threejs")` did not load the CommonJS
+  build: under `"type": "module"` Node read `dist/arjs-plugin-threejs.js` as
+  ESM, and the call threw or returned an empty object, depending on the Node
+  version. The CommonJS build is now `dist/arjs-plugin-threejs.cjs`, which
+  `main` and the `require` condition point to (#19).
 - A window resize replaced the AR projection set by `ar:camera` with a
   generic perspective one. It now resizes the canvas only.
 - An option passed as `undefined` erased its default.

@@ -25,10 +25,11 @@ npm run build         # vite build + tsc declarations (types/, git-ignored)
 npm run format        # prettier --write .
 npm run format:check  # prettier --check .
 npm run lint          # eslint
+npm run test:exports  # require() and import() the built package (after build:vite)
 ```
 
 Node is pinned in `.nvmrc` (v24.21.0). CI (`.github/workflows/CI.yml`) runs
-`npm ci`, `build:vite`, `build:types` with `test:types`, the
+`npm ci`, `build:vite` with `test:exports`, `build:types` with `test:types`, the
 `examples/minimal` build, `format:check`, `lint` and `npm test`.
 
 ## Architecture
