@@ -11,10 +11,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -25,8 +25,29 @@ jobs:
       - name: Build library
         run: npm run build:vite
 
+      # Loads the built package by name through require() and import(), as a
+      # CommonJS and an ESM consumer would (#19).
+      - name: Entry points
+        run: npm run test:exports
+
+      # Builds types/ and type-checks it the way a consumer imports it
+      # (package.json "exports", moduleResolution "bundler").
+      - name: Type declarations
+        run: |
+          npm run build:types
+          npm run test:types
+
+      # The example links the library's dist/ (file:../..), built above.
+      - name: Build minimal example
+        run: |
+          npm ci --prefix examples/minimal
+          npm run build --prefix examples/minimal
+
       - name: Check formatting
         run: npm run format:check
+
+      - name: Lint
+        run: npm run lint
 
       - name: Run tests
         run: npm test -- --reporter=dot

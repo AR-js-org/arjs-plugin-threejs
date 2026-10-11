@@ -1,18 +1,24 @@
 {
   "name": "@ar-js-org/arjs-plugin-threejs",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Three.js renderer plugin for AR.js-core",
   "type": "module",
-  "main": "dist/arjs-plugin-threejs.js",
+  "main": "dist/arjs-plugin-threejs.cjs",
   "module": "dist/arjs-plugin-threejs.mjs",
   "types": "types/index.d.ts",
   "exports": {
     ".": {
+      "types": "./types/index.d.ts",
       "import": "./dist/arjs-plugin-threejs.mjs",
-      "require": "./dist/arjs-plugin-threejs.js",
+      "require": "./dist/arjs-plugin-threejs.cjs",
       "default": "./dist/arjs-plugin-threejs.mjs"
     }
   },
+  "files": [
+    "dist",
+    "types",
+    "!**/*.map"
+  ],
   "sideEffects": false,
   "scripts": {
     "build": "npm run build:vite && npm run build:types",
@@ -21,12 +27,14 @@
     "dev:vite": "vite",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "lint": "eslint . --ext .js",
+    "lint": "eslint .",
     "prepare": "husky",
     "prepublishOnly": "npm run build",
     "serve:vite": "vite preview",
     "test": "vitest run --coverage",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:types": "tsc -p test/typecheck",
+    "test:exports": "node dev/check-exports.mjs"
   },
   "keywords": [
     "ar.js",
@@ -38,18 +46,35 @@
   "author": "Walter Perdan @kalwalt https://github.com/kalwalt",
   "license": "MIT",
   "devDependencies": {
-    "@vitest/coverage-v8": "^4.0.16",
-    "eslint": "^9.39.2",
+    "@eslint/js": "^10.0.1",
+    "@types/three": "^0.186.0",
+    "@vitest/coverage-v8": "^5.0.3",
+    "eslint": "^10.12.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.13.0",
     "husky": "^9.1.7",
-    "jsdom": "^27.3.0",
-    "prettier": "^3.7.4",
-    "three": "^0.182.0",
-    "typescript": "^5.9.3",
-    "vite": "^7.3.0",
-    "vitest": "^4.0.16"
+    "jsdom": "^29.1.1",
+    "prettier": "^3.9.9",
+    "three": "^0.186.0",
+    "typescript": "^6.0.3",
+    "vite": "^8.3.4",
+    "vitest": "^5.0.3"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/AR-js-org/arjs-plugin-threejs.git"
+    "url": "git+https://github.com/AR-js-org/arjs-plugin-threejs.git"
+  },
+  "peerDependencies": {
+    "@ar-js-org/ar.js-next": "^0.2.0",
+    "@types/three": ">=0.182.0",
+    "three": ">=0.182.0"
+  },
+  "peerDependenciesMeta": {
+    "@ar-js-org/ar.js-next": {
+      "optional": true
+    },
+    "@types/three": {
+      "optional": true
+    }
   }
 }

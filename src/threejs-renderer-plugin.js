@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { markerKey, normalizeMarker, toMatrix16 } from "./marker.js";
 
 // Version injected at build time by Vite define.
 // If the define is missing (e.g. in a non-Vite test harness), fallback to 'unknown'.
@@ -9,12 +10,53 @@ const THREEJS_RENDERER_PLUGIN_VERSION =
 
 export { THREEJS_RENDERER_PLUGIN_VERSION };
 /**
- * Plugin to render THREE.js scenes driven by AR markers.
- * Provides management of renderer, scene, camera and marker anchors.
- * Supported options: antialias, alpha, preferRAF, container, invertModelView, applyAxisFix
+ * How an incoming pose matrix maps onto an anchor. `'webgl'` uses it as is,
+ * the convention arjs-plugin-artoolkit >= 0.2.0 emits; `'legacy'` applies the
+ * classic AR.js axis chain, for artoolkit5-js poses.
+ *
+ * @typedef {'webgl' | 'legacy'} MatrixConvention
+ */
+
+/**
+ * @typedef {Object} ThreeJSRendererPluginOptions
+ * @property {boolean} [antialias=true]
+ * @property {boolean} [alpha=true] - Transparent canvas over the video
+ * @property {boolean} [preferRAF=true] - Render on requestAnimationFrame, not only on engine:update
+ * @property {HTMLElement|null} [container] - Where the canvas is mounted; document.body by default
+ * @property {number} [minConfidence=0] - Found/updated events below this confidence are ignored
+ * @property {MatrixConvention} [matrixConvention='webgl']
+ * @property {'modelViewMatrix' | 'cameraTransformMatrix'} [changeMatrixMode='modelViewMatrix'] - 'legacy' only
+ * @property {boolean} [invertModelView=false] - 'webgl' only
+ * @property {boolean} [applyAxisFix=false] - 'webgl' only
+ * @property {boolean} [useLegacyAxisChain] - Deprecated: use matrixConvention
+ * @property {boolean} [debugSceneAxes=false]
+ * @property {number} [sceneAxesSize=2]
+ * @property {boolean} [debugAnchorAxes=false]
+ * @property {number} [anchorAxesSize=0.5]
+ * @property {((opts: {antialias: boolean, alpha: boolean}) => any) | null} [rendererFactory] - Replaces the WebGLRenderer, for tests
+ */
+
+/**
+ * What an anchor's `userData` holds once its marker has been seen.
+ *
+ * @typedef {Object} AnchorUserData
+ * @property {string} markerId - The marker's ID within its family
+ * @property {import("./marker.js").MarkerType} type - The marker family
+ * @property {number} [confidence] - Last detection confidence
+ * @property {Array<[number, number]>} [vertex] - Last detected corners, a copy
+ * @property {number} [dir] - Last rotation, 0 to 3
+ */
+
+/**
+ * Renders a Three.js scene over the camera view and keeps one anchor
+ * (`THREE.Group`) per marker, keyed `type:markerId`, whose matrix follows the
+ * marker's pose. Applications attach their 3D content to anchors.
  */
 
 export class ThreeJSRendererPlugin {
+  /**
+   * @param {ThreeJSRendererPluginOptions} [options]
+   */
   constructor(options = {}) {
     this.name = "threejs-renderer";
     this.version = THREEJS_RENDERER_PLUGIN_VERSION;
@@ -26,30 +68,49 @@ export class ThreeJSRendererPlugin {
     this.camera = null;
     this.anchors = new Map();
 
+    // An option passed as undefined keeps its default rather than erasing it.
+    const given = Object.fromEntries(
+      Object.entries(options).filter(([, value]) => value !== undefined),
+    );
+
+    // useLegacyAxisChain (0.1.x) is replaced by matrixConvention.
+    if (given.useLegacyAxisChain !== undefined) {
+      console.warn(
+        "[ThreeJSRendererPlugin] useLegacyAxisChain is replaced by matrixConvention ('webgl' | 'legacy').",
+      );
+      given.matrixConvention ??= given.useLegacyAxisChain ? "legacy" : "webgl";
+      delete given.useLegacyAxisChain;
+    }
+
     this.options = {
-      antialias: options.antialias ?? true,
-      alpha: options.alpha ?? true,
-      preferRAF: options.preferRAF ?? true, // render even if engine:update absent
-      container: options.container || null, // DOM node to mount canvas
-      minConfidence: options.minConfidence ?? 0, // optional filter for e.marker.confidence
+      antialias: true,
+      alpha: true,
+      preferRAF: true, // render even if engine:update absent
+      container: null, // DOM node to mount canvas
+      minConfidence: 0, // markers below this confidence are ignored
 
-      // Legacy AR.js transform chain (defaults match classic AR.js)
-      useLegacyAxisChain: options.useLegacyAxisChain ?? true,
-      changeMatrixMode: options.changeMatrixMode || "modelViewMatrix",
+      // 'webgl': the matrix is used as is, the convention arjs-plugin-artoolkit
+      // >= 0.2.0 emits. 'legacy': the classic AR.js axis chain, for
+      // artoolkit5-js poses.
+      matrixConvention: "webgl",
+      changeMatrixMode: "modelViewMatrix", // 'legacy' only
 
-      // Experimental (ignored if useLegacyAxisChain = true)
-      invertModelView: options.invertModelView ?? false,
-      applyAxisFix: options.applyAxisFix ?? false,
+      // 'webgl' only
+      invertModelView: false,
+      applyAxisFix: false,
 
-      // NEW: Debug helpers (default off)
-      debugSceneAxes: options.debugSceneAxes ?? false,
-      sceneAxesSize: options.sceneAxesSize ?? 2,
-      debugAnchorAxes: options.debugAnchorAxes ?? false,
-      anchorAxesSize: options.anchorAxesSize ?? 0.5,
-      // NEW: dependency injection for tests
-      rendererFactory: options.rendererFactory || null,
-      ...options,
+      // Debug helpers (default off)
+      debugSceneAxes: false,
+      sceneAxesSize: 2,
+      debugAnchorAxes: false,
+      anchorAxesSize: 0.5,
+      // Dependency injection for tests
+      rendererFactory: null,
+      ...given,
     };
+
+    // Set once an AR projection arrives on ar:camera; a resize then leaves it.
+    this._hasArProjection = false;
 
     this._rafId = 0;
 
@@ -59,7 +120,7 @@ export class ThreeJSRendererPlugin {
       .multiply(new THREE.Matrix4().makeRotationZ(Math.PI));
 
     console.log(`[ThreeJSRendererPlugin] v${this.version} constructed`, {
-      legacyAxisChain: this.options.useLegacyAxisChain,
+      matrixConvention: this.options.matrixConvention,
       changeMatrixMode: this.options.changeMatrixMode,
       preferRAF: this.options.preferRAF,
       debugSceneAxes: this.options.debugSceneAxes,
@@ -89,6 +150,8 @@ export class ThreeJSRendererPlugin {
 
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(60, 1, 0.01, 2000);
+    // A fresh camera has no AR projection yet, even on a reused instance.
+    this._hasArProjection = false;
 
     // Lighting
     this.scene.add(new THREE.AmbientLight(0xffffff, 0.6));
@@ -119,19 +182,14 @@ export class ThreeJSRendererPlugin {
 
     this._onUpdate = () => this.handleUpdate();
     this._onMarker = (e) => this.handleUnifiedMarker(e);
-    this._onGetMarker = (e) => this.handleRawGetMarker(e);
     this._onCamera = (e) => this.handleCamera(e);
-    this._onLegacyFound = (d) =>
-      this.handleUnifiedMarker(this._adaptLegacy(d, true));
-    this._onLegacyUpdated = (d) =>
-      this.handleUnifiedMarker(this._adaptLegacy(d, true));
-    this._onLegacyLost = (d) =>
-      this.handleUnifiedMarker(this._adaptLegacy(d, false));
+    this._onLegacyFound = (d) => this._applyMarker(normalizeMarker(d, true));
+    this._onLegacyUpdated = (d) => this._applyMarker(normalizeMarker(d, true));
+    this._onLegacyLost = (d) => this._applyMarker(normalizeMarker(d, false));
     this._onResize = () => this.handleResize();
 
     this._sub("engine:update", this._onUpdate);
     this._sub("ar:marker", this._onMarker);
-    this._sub("ar:getMarker", this._onGetMarker);
     this._sub("ar:camera", this._onCamera);
     this._sub("ar:markerFound", this._onLegacyFound);
     this._sub("ar:markerUpdated", this._onLegacyUpdated);
@@ -159,7 +217,6 @@ export class ThreeJSRendererPlugin {
     if (this.emitter?.off) {
       this._off("engine:update", this._onUpdate);
       this._off("ar:marker", this._onMarker);
-      this._off("ar:getMarker", this._onGetMarker);
       this._off("ar:camera", this._onCamera);
       this._off("ar:markerFound", this._onLegacyFound);
       this._off("ar:markerUpdated", this._onLegacyUpdated);
@@ -182,6 +239,7 @@ export class ThreeJSRendererPlugin {
     this.renderer = null;
     this.scene = null;
     this.camera = null;
+    this._hasArProjection = false;
     this.engine = null;
     this.emitter = null;
     console.log("[ThreeJSRendererPlugin] Disposed v" + this.version);
@@ -198,67 +256,74 @@ export class ThreeJSRendererPlugin {
     } catch {}
   }
 
-  _adaptLegacy(d, visible) {
-    return {
-      id: String(d?.markerId ?? d?.id ?? "0"),
-      matrix:
-        d?.matrix ||
-        d?.transformationMatrix ||
-        d?.modelViewMatrix ||
-        d?.poseMatrix ||
-        null,
-      visible,
-      _legacy: true,
-    };
-  }
-
-  handleRawGetMarker(e) {
-    if (!e) return;
-    const confidence = e?.marker?.confidence;
-    if (confidence !== undefined && confidence < this.options.minConfidence)
-      return;
-    const id = String(
-      e?.marker?.markerId ??
-        e?.marker?.id ??
-        e?.marker?.pattHandle ??
-        e?.marker?.uid ??
-        e?.marker?.index ??
-        "0",
-    );
-    const matrix = e?.matrix;
-    this.handleUnifiedMarker({
-      id,
-      matrix,
-      visible: true,
-      _source: "ar:getMarker",
-    });
-  }
-
+  /**
+   * Handles `ar:marker`, the renderer's own unified event
+   * `{ id | markerId, type?, matrix?, visible? }`. Marker events from
+   * arjs-plugin-artoolkit arrive through the same path.
+   *
+   * @param {Object} evt - The event payload
+   * @returns {void}
+   */
   handleUnifiedMarker(evt) {
-    const { id, matrix, visible } = evt || {};
-    if (id == null) return;
+    this._applyMarker(normalizeMarker(evt, evt?.visible));
+  }
 
-    let anchor = this.anchors.get(id);
+  /**
+   * Creates or updates the anchor for a normalised marker.
+   *
+   * @param {import("./marker.js").NormalizedMarker|null} marker
+   * @returns {void}
+   * @private
+   */
+  _applyMarker(marker) {
+    if (!marker || !this.scene) return;
+    const { key, matrix, visible, confidence } = marker;
+
+    // Found/updated below minConfidence is ignored; a loss always applies.
+    if (
+      visible !== false &&
+      confidence !== undefined &&
+      confidence < this.options.minConfidence
+    ) {
+      return;
+    }
+
+    let anchor = this.anchors.get(key);
     if (!anchor) {
+      // A loss for a marker never seen has nothing to hide.
+      if (visible === false) return;
       anchor = new THREE.Group();
-      anchor.name = `marker-${id}`;
+      anchor.name = `marker-${key}`;
       anchor.matrixAutoUpdate = false;
       // Debug: anchor axes (optional)
       if (this.options.debugAnchorAxes) {
         anchor.add(new THREE.AxesHelper(this.options.anchorAxesSize));
       }
       this.scene.add(anchor);
-      this.anchors.set(id, anchor);
-      console.log("[ThreeJSRendererPlugin] anchor created", id);
+      this.anchors.set(key, anchor);
+      console.log("[ThreeJSRendererPlugin] anchor created", key);
     }
 
     if (typeof visible === "boolean") anchor.visible = visible;
 
-    if (Array.isArray(matrix) && matrix.length === 16) {
-      const modelView = new THREE.Matrix4().fromArray(matrix);
+    if (visible !== false) {
+      // Copied: the detector reuses its buffers between frames.
+      anchor.userData = {
+        ...anchor.userData,
+        markerId: marker.markerId,
+        type: marker.type,
+        confidence,
+        vertex: marker.vertex?.map((corner) => [corner[0], corner[1]]),
+        dir: marker.dir,
+      };
+    }
+
+    const pose = toMatrix16(matrix);
+    if (pose && visible !== false) {
+      const modelView = new THREE.Matrix4().fromArray(pose);
 
       let final;
-      if (this.options.useLegacyAxisChain) {
+      if (this.options.matrixConvention === "legacy") {
         // Legacy chain: R_y(π) * R_z(π) * modelView * R_x(π/2)
         const projectionAxis = new THREE.Matrix4()
           .makeRotationY(Math.PI)
@@ -273,7 +338,7 @@ export class ThreeJSRendererPlugin {
           final.invert();
         }
       } else {
-        // Experimental path
+        // 'webgl': already in the Three.js convention
         final = modelView.clone();
         if (this.options.invertModelView) final.invert();
         if (this.options.applyAxisFix) final.multiply(this._axisFix);
@@ -285,8 +350,9 @@ export class ThreeJSRendererPlugin {
   }
 
   handleCamera(e) {
-    const arr = e?.projectionMatrix || e?.matrix;
-    if (Array.isArray(arr) && arr.length === 16) {
+    const arr = toMatrix16(e?.projectionMatrix) ?? toMatrix16(e?.matrix);
+    if (arr) {
+      this._hasArProjection = true;
       this.camera.projectionMatrix.fromArray(arr);
       this.camera.projectionMatrixInverse
         .copy(this.camera.projectionMatrix)
@@ -312,12 +378,24 @@ export class ThreeJSRendererPlugin {
     const w = container.clientWidth || window.innerWidth;
     const h = container.clientHeight || Math.round((w * 3) / 4);
     this.renderer.setSize?.(w, h);
-    this.camera.aspect = w / h;
-    this.camera.updateProjectionMatrix();
+    // updateProjectionMatrix() rebuilds a generic perspective projection,
+    // which would replace the AR one from ar:camera.
+    if (!this._hasArProjection) {
+      this.camera.aspect = w / h;
+      this.camera.updateProjectionMatrix();
+    }
   }
 
-  getAnchor(id) {
-    return this.anchors.get(String(id));
+  /**
+   * The anchor of a marker, keyed by family: pattern and barcode IDs both
+   * start at 0.
+   *
+   * @param {number|string} markerId - The marker's ID within its family
+   * @param {import("./marker.js").MarkerType} [type='pattern'] - The marker family
+   * @returns {import("three").Group|undefined} The anchor, once the marker has been seen
+   */
+  getAnchor(markerId, type = "pattern") {
+    return this.anchors.get(markerKey(markerId, type));
   }
   getScene() {
     return this.scene;
