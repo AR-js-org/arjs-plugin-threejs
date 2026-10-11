@@ -10,7 +10,7 @@ a minor version may break the API; every breaking change is marked
 
 ## [Unreleased]
 
-## [0.2.0] - 2026-10-10
+## [0.2.0] - 2026-10-11
 
 Matches arjs-plugin-artoolkit 0.2.0 and later; the camera projection
 (`ar:camera`) needs 0.4.0.
